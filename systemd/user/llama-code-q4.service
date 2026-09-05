@@ -1,0 +1,13 @@
+[Unit]
+Description=Llama Code Q4 131K (RTX 3090 -np 1)
+After=network.target
+
+[Service]
+Type=simple
+ExecStart=/usr/local/bin/llama-server --model /models/coder-q4.gguf -c 131072 -np 1 --ctx-size 131072 --host 127.0.0.1 --port 8082
+Restart=always
+RestartSec=5
+Environment=PYTHONUNBUFFERED=1
+
+[Install]
+WantedBy=default.target

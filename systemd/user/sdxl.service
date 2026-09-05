@@ -1,0 +1,14 @@
+[Unit]
+Description=SDXL ComfyUI :8188
+After=network.target
+
+[Service]
+Type=simple
+WorkingDirectory=%h/ComfyUI
+ExecStart=/usr/bin/python3 main.py --listen 127.0.0.1 --port 8188
+Restart=always
+RestartSec=5
+Environment=PYTHONUNBUFFERED=1
+
+[Install]
+WantedBy=default.target

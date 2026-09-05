@@ -1,0 +1,15 @@
+[Unit]
+Description=Model Router Gateway :8000 (FastAPI)
+After=network.target
+
+[Service]
+Type=simple
+WorkingDirectory=%h/Descargas/model-router
+ExecStart=%h/.local/bin/uvicorn src.gateway.app:app --host 127.0.0.1 --port 8000 --workers 1
+Restart=always
+RestartSec=3
+Environment=PYTHONUNBUFFERED=1
+# single-node exclusive VRAM — gateway owns lifecycle, backsends stay on 127.0.0.1 only
+
+[Install]
+WantedBy=default.target
