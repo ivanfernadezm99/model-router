@@ -1,0 +1,25 @@
+models:
+  coder-q4-131k:
+    service: llama-code-q4.service
+    port: 8082
+    health_endpoint: /health
+    vram_mb: 14000
+    args: ["--model", "/models/coder-q4.gguf", "-c", "131072", "-np", "1", "--ctx-size", "131072"]
+  coder-q5-65k:
+    service: llama-code-q5.service
+    port: 8082
+    health_endpoint: /health
+    vram_mb: 18000
+    args: ["--model", "/models/coder-q5.gguf", "-c", "65536", "-np", "1", "--ctx-size", "65536"]
+  sdxl:
+    service: sdxl.service
+    port: 8188
+    health_endpoint: /system_stats
+    vram_mb: 6500
+    args: ["--listen", "127.0.0.1", "--port", "8188"]
+defaults:
+  model: coder-q4-131k
+  idle_timeout_seconds: 600
+  swap_timeout_seconds: 240
+  health_interval_seconds: 2
+  bind: "127.0.0.1:8000"
