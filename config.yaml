@@ -1,16 +1,22 @@
 models:
-  coder-q4-131k:
+  coder-14b-200k:
     service: llama-code-q4.service
     port: 8082
     health_endpoint: /health
-    vram_mb: 14000
-    args: ["--model", "/models/coder-q4.gguf", "-c", "131072", "-np", "1", "--ctx-size", "131072"]
+    vram_mb: 20000
+    args: ["--model", "/home/servidor/Modelos/Qwen2.5-Coder-14B-Instruct-Q4_K_M.gguf", "-c", "131072", "-np", "1", "--ctx-size", "131072"]
   coder-q5-65k:
     service: llama-code-q5.service
     port: 8082
     health_endpoint: /health
     vram_mb: 18000
     args: ["--model", "/models/coder-q5.gguf", "-c", "65536", "-np", "1", "--ctx-size", "65536"]
+  wan-14b:
+    service: wan-video.service
+    port: 8189
+    health_endpoint: /health
+    vram_mb: 20000
+    args: ["--host", "127.0.0.1", "--port", "8189"]
   sdxl:
     service: sdxl.service
     port: 8188
@@ -18,7 +24,7 @@ models:
     vram_mb: 6500
     args: ["--listen", "127.0.0.1", "--port", "8188"]
 defaults:
-  model: coder-q4-131k
+  model: coder-14b-200k
   idle_timeout_seconds: 600
   swap_timeout_seconds: 240
   health_interval_seconds: 2

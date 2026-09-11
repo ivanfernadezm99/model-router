@@ -10,7 +10,7 @@ ALLOWED = {"code", "image", "video"}
 TASK_TO_MODEL = {
     "code": "coder-14b-200k",
     "image": "sdxl",
-    "video": "sdxl",
+    "video": "wan-14b",
 }
 
 PREFIXES = ("code:", "image:", "video:")

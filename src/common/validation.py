@@ -1,7 +1,7 @@
 import re
 import subprocess
 
-ALLOWED = {"127.0.0.1:8082/health", "127.0.0.1:8188/system_stats"}
+ALLOWED = {"127.0.0.1:8082/health", "127.0.0.1:8188/system_stats", "127.0.0.1:8189/health"}
 
 
 def validate_np(args: list[str]) -> None:

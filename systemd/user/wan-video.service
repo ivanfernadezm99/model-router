@@ -1,0 +1,15 @@
+[Unit]
+Description=Wan2.1 T2V-14B Video Generation :8189 (RTX 3090)
+After=network.target
+
+[Service]
+Type=simple
+WorkingDirectory=%h/Wan2.1
+Environment=WAN_MODEL_DIR=/home/servidor/Modelos/Wan2.1-T2V-14B
+ExecStart=%h/Wan2.1/.venv/bin/python -m uvicorn wan_server:app --host 127.0.0.1 --port 8189
+Restart=always
+RestartSec=5
+Environment=PYTHONUNBUFFERED=1
+
+[Install]
+WantedBy=default.target
