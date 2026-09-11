@@ -4,7 +4,7 @@ After=network.target
 
 [Service]
 Type=simple
-ExecStart=/home/servidor/llama.cpp/build/bin/llama-server -m /home/servidor/Modelos/Qwen2.5-Coder-14B-Instruct-Q4_K_M.gguf --host 127.0.0.1 --port 8082 -c 100000 --rope-scaling yarn --yarn-orig-ctx 32768 -ctk q4_0 -ctv q4_0 -ngl 99 -np 1 --kv-unified --flash-attn on --jinja --chat-template-file /media/servidor/d0a196c3-2d36-4431-b15d-8ea078ad8222/EcEnlacesChacoPython/debug/qwen25-coder-tools.jinja --alias local-template
+ExecStart=/home/servidor/llama.cpp/build/bin/llama-server -m /home/servidor/Modelos/Qwen2.5-Coder-14B-Instruct-Q4_K_M.gguf --host 127.0.0.1 --port 8082 -c 100000 --rope-scaling yarn --yarn-orig-ctx 32768 -ctk q4_0 -ctv q4_0 -ngl 99 -np 1 --kv-unified --flash-attn on --jinja --chat-template-file %h/Descargas/model-router/templates/qwen25-coder-tools.jinja --alias local-template
 Restart=always
 RestartSec=5
 Environment=PYTHONUNBUFFERED=1
