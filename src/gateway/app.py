@@ -16,6 +16,7 @@ from src.gateway.queue import GatewayQueue
 from src.orchestrator.idle import IdleReaper
 from src.orchestrator.lifecycle import Orchestrator
 from src.registry.registry import Registry
+from src.jobs.router import router as job_router
 
 logger = logging.getLogger(__name__)
 
@@ -41,6 +42,7 @@ async def lifespan(app: FastAPI):
 
 
 app = FastAPI(lifespan=lifespan)
+app.include_router(job_router)
 
 
 @app.get("/health")
