@@ -1,10 +1,10 @@
 [Unit]
-Description=Llama Code Q4 100K (RTX 3090 -np 1)
+Description=Llama Code Qwen2.5-Coder 14B 100K (RTX 3090)
 After=network.target
 
 [Service]
 Type=simple
-ExecStart=/usr/local/bin/llama-server --model /models/coder-q4.gguf -c 100000 -np 1 --ctx-size 100000 --host 127.0.0.1 --port 8082
+ExecStart=/home/servidor/llama.cpp/build/bin/llama-server -m /home/servidor/Modelos/Qwen2.5-Coder-14B-Instruct-Q4_K_M.gguf --host 127.0.0.1 --port 8082 -c 100000 --rope-scaling yarn --yarn-orig-ctx 32768 -ctk q4_0 -ctv q4_0 -ngl 99 -np 1 --kv-unified --flash-attn on --jinja --chat-template-file /media/servidor/d0a196c3-2d36-4431-b15d-8ea078ad8222/EcEnlacesChacoPython/debug/qwen25-coder-tools.jinja --alias local-template
 Restart=always
 RestartSec=5
 Environment=PYTHONUNBUFFERED=1
