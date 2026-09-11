@@ -5,7 +5,7 @@ from src.registry.registry import Registry
 
 def test_happy():
     r = Registry("config.yaml").load()
-    assert r.resolve("coder-q4-131k")["port"] == 8082
+    assert r.resolve("coder-14b-200k")["port"] == 8082
     assert r.resolve("sdxl")["port"] == 8188
 
 

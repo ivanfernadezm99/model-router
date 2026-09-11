@@ -8,7 +8,7 @@ logger = logging.getLogger(__name__)
 ALLOWED = {"code", "image", "video"}
 # task -> registry model key (code uses defaults.model)
 TASK_TO_MODEL = {
-    "code": "coder-q4-131k",
+    "code": "coder-14b-200k",
     "image": "sdxl",
     "video": "sdxl",
 }

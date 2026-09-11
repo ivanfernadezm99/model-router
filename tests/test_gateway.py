@@ -45,7 +45,7 @@ def test_detector_unknown_hint_400():
 
 def test_detector_validates_registry():
     mock_reg = MagicMock()
-    mock_reg.models = {"coder-q4-131k": {}, "sdxl": {}}
+    mock_reg.models = {"coder-14b-200k": {}, "sdxl": {}}
     assert detect_task({"X-Model-Hint": "code"}, {}, registry=mock_reg) == "code"
     # unknown task mapping still raises
     with pytest.raises(ValueError):
@@ -58,7 +58,7 @@ def test_detector_messages_content_prefix():
 
 
 def test_task_to_model():
-    assert task_to_model("code") == "coder-q4-131k"
+    assert task_to_model("code") == "coder-14b-200k"
     assert task_to_model("image") == "sdxl"
 
 
@@ -82,7 +82,7 @@ async def test_queue_same_target_coalesce():
 async def test_queue_fifo_drain():
     q = GatewayQueue()
     await q.enqueue("sdxl", "a")
-    await q.enqueue("coder-q4-131k", "b")
+    await q.enqueue("coder-14b-200k", "b")
     await q.enqueue("sdxl", "c")
     items = await q.drain_fifo()
     assert [i["request_id"] for i in items] == ["a", "b", "c"]
