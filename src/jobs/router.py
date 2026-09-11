@@ -14,6 +14,19 @@ MAX_PAYLOAD_SIZE = 5 * 1024 * 1024
 class VideoJobRequest(BaseModel):
     prompt: constr(min_length=1)
 
+class ImageJobRequest(BaseModel):
+    prompt: constr(min_length=1)
+    quality: str = "balanced"
+    width: int | None = None
+    height: int | None = None
+    steps: int | None = None
+
+IMAGE_PRESETS = {
+    "draft": {"width": 512, "height": 512, "steps": 20, "cfg": 5},
+    "balanced": {"width": 768, "height": 768, "steps": 30, "cfg": 7},
+    "max": {"width": 1024, "height": 1024, "steps": 50, "cfg": 7.5},
+}
+
 class JobStatusResponse(BaseModel):
     id: str
     status: str
@@ -21,6 +34,21 @@ class JobStatusResponse(BaseModel):
     updated_at: str
     result: Any | None = None
     error: Any | None = None
+
+@router.post("/image", status_code=202)
+async def enqueue_image_job(req: ImageJobRequest) -> Dict[str, Any]:
+    q = req.quality.lower()
+    if q not in IMAGE_PRESETS:
+        raise HTTPException(status_code=400, detail="quality must be draft|balanced|max")
+    preset = IMAGE_PRESETS[q]
+    w = req.width or preset["width"]
+    h = req.height or preset["height"]
+    s = req.steps or preset["steps"]
+    payload = {"prompt": req.prompt, "quality": q, "width": w, "height": h, "steps": s, "cfg": preset["cfg"]}
+    if len(json.dumps(payload).encode("utf-8")) > MAX_PAYLOAD_SIZE:
+        raise HTTPException(status_code=413, detail="Payload too large")
+    job_id = queue.enqueue(payload)
+    return {"id": job_id}
 
 @router.post("/video", status_code=202)
 async def enqueue_video_job(req: VideoJobRequest) -> Dict[str, str]:
