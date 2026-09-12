@@ -19,6 +19,9 @@ from src.registry.registry import Registry
 from src.jobs.router import router as job_router
 
 logger = logging.getLogger(__name__)
+# ensure JSON request logs appear in journalctl (uvicorn default filters app loggers)
+logging.basicConfig(level=logging.INFO, format="%(message)s")
+logger.setLevel(logging.INFO)
 
 # singletons — importable for tests
 registry = Registry()
@@ -106,9 +109,9 @@ async def v1_proxy(path: str, request: Request):
 
     # if target equals active -> proxy directly (fast path)
     if orchestrator.active_model == target_model:
-        # also check queue not empty? if queue has items, we still proxy current directly then drain will proxy queued
         resp = await proxy_request(request, target_port)
-        # attach fallback header if needed? normal path no fallback
+        latency_ms = int((time.monotonic() - start) * 1000)
+        logger.info(json.dumps({"request_id": request_id, "hint": task, "target_model": target_model, "queue_depth": queue.depth(), "latency_ms": latency_ms, "status": resp.status_code}))
         return resp
 
     # if active is None but target port is already healthy (manual server), adopt it and proxy directly
@@ -121,6 +124,8 @@ async def v1_proxy(path: str, request: Request):
                 orchestrator.active_model = target_model
                 orchestrator.active_service = registry.resolve(target_model)["service"]
                 resp = await proxy_request(request, target_port)
+                latency_ms = int((time.monotonic() - start) * 1000)
+                logger.info(json.dumps({"request_id": request_id, "hint": task, "target_model": target_model, "queue_depth": queue.depth(), "latency_ms": latency_ms, "status": resp.status_code, "adopted": True}))
                 return resp
         except Exception:
             pass
@@ -157,6 +162,8 @@ async def v1_proxy(path: str, request: Request):
 
         # swap succeeded — proxy current request
         resp = await proxy_request(request, target_port)
+        latency_ms = int((time.monotonic() - start) * 1000)
+        logger.info(json.dumps({"request_id": request_id, "hint": task, "target_model": target_model, "queue_depth": queue.depth(), "latency_ms": latency_ms, "status": resp.status_code, "swapped": True}))
 
         # drain FIFO queue items that arrived during swap (arrival order) — best-effort proxy in order
         # We don't proxy queued items automatically here (they already got 202). Drain is for metrics/tests;
