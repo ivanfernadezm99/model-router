@@ -134,8 +134,45 @@ curl -s http://127.0.0.1:8000/v1/chat/completions -H "Content-Type: application/
 | coder-q4-131k | 14000 MB | 8082 | `-np 1 -c 131072` |
 | coder-q5-65k | 18000 MB | 8082 | `-np 1 -c 65536` |
 | sdxl | 6500 MB | 8188 | `--listen 127.0.0.1 --port 8188` |
+| wan-14b | 20000 MB (pico 23900) | 8189 | `Wan2.1-T2V-14B, t5_cpu=True, offload, PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True` |
 
 Guard fail-closed: `nvidia-smi` garbage/`N/A`/returncode!=0 → `None` → bloquea `can_start`. Idle <2 GB verificado tras cada `stop` y por `IdleReaper`.
+
+> **Wan 14B en 3090 — offload agresivo obligatorio:** el modelo ocupa 65 GB en disco y 23 GB en VRAM al cargar. Con `t5_cpu=True` + `model.cpu()/vae.cpu()` tras init + `offload_model=True` por step y `expandable_segments:True`, queda en 18 MiB idle y solo sube a ~20 GB durante los 20 steps. Default `num_frames=17` (4n+1, ~1s video) para entrar en 24 GB; `33` o `81` frames OOMean sin este offload. Ver `~/Wan2.1/wan_server.py` y `systemd/user/wan-video.service.d/override.conf`.
+
+## Logs — qué pasa adentro
+
+Gateway loguea JSON por cada request (ahora sí en `journalctl`):
+```bash
+journalctl --user -u model-router-gateway.service -f
+journalctl --user -u model-router-gateway.service -o cat | grep request_id
+# {"request_id":"a1b2c3d4","hint":"video","target_model":"wan-14b","queue_depth":2,"latency_ms":1234,"status":200,"swapped":true}
+journalctl --user -u wan-video.service -f
+nvidia-smi  # VRAM real
+curl -s http://127.0.0.1:8000/health | jq
+curl -s http://127.0.0.1:8000/metrics | grep model_router
+```
+`src/gateway/app.py` tiene `logging.basicConfig INFO` + `logger.info` en fast-path/adopted/swapped/queued/400/504. `PYTHONUNBUFFERED=1` en systemd asegura flush inmediato.
+
+## Notificaciones Telegram — jobs async
+
+`POST /jobs/video` y `/jobs/image` ahora mandan Telegram al terminar si configuras el bot (fire-and-forget, timeout 5s):
+```bash
+# ya configurado en este host (icemorphBot)
+# TOKEN=7757499045:AAH...  CHAT_ID=1422594274  en /home/servidor/.env y systemctl --user set-environment
+curl -s http://127.0.0.1:8000/jobs/video -H "Content-Type: application/json" -d '{"prompt":"a cat dancing"}'
+# → {"id":"..."}  y luego por Telegram: "✅ video job ab12cd34 terminado" + Archivo: /tmp/wan_*.mp4
+# o "❌ video job ... falló"
+
+# para activar en otro host:
+export XDG_RUNTIME_DIR=/run/user/$(id -u) && export DBUS_SESSION_BUS_ADDRESS=unix:path=$XDG_RUNTIME_DIR/bus
+systemctl --user set-environment TELEGRAM_BOT_TOKEN=TU_TOKEN
+systemctl --user set-environment TELEGRAM_CHAT_ID=TU_CHAT_ID
+systemctl --user daemon-reload && systemctl --user restart model-router-gateway.service
+# polling siempre disponible:
+curl -s http://127.0.0.1:8000/jobs/{id} | jq  # queued → running → completed/failed
+```
+Código: `src/jobs/worker.py:_notify_telegram()` y `httpx POST https://api.telegram.org/bot{token}/sendMessage`. Si no hay env, no notifica (silencioso).
 
 ## Holds — cuda-driver-580 + kornia==0.6.12
 
@@ -167,8 +204,16 @@ Secuencia `code→image→video→code` con mocks: `pytest tests/test_e2e_queue.
 ## Tests
 
 ```bash
-python3 -m pytest -q
+python3 -m pytest -q  # 48 passed
 python3 -m pytest tests/test_e2e_queue.py -v
 systemd-analyze verify systemd/user/*.service
 grep -q "Restart=always" systemd/user/model-router-gateway.service && echo ok
 ```
+
+## Operación segura — no romper nada
+
+- **Nunca corras dos modelos a la vez manualmente:** usa siempre `:8000` (gateway hace `stop-before-start` con `asyncio.Lock`). `systemctl --user stop llama-code-q4 && start wan-video` manual rompe el invariante y deja 24 GB ocupados → OOM.
+- **No toques `config.yaml` sin validar:** `python -c "from src.registry.registry import Registry; Registry().load(); print('ok')"`
+- **Holds fijos:** `cuda-driver-580` y `kornia==0.6.12` — un upgrade rompe CUDA 13 o ComfyUI en FX-8350.
+- **Logs antes de reiniciar:** `journalctl --user -u model-router-gateway.service -n 50` y `nvidia-smi`
+- **Wan 14B:** no cambies `t5_cpu` ni `expandable_segments` sin probar con `17 frames` primero. `81 frames` OOMea en 3090 sin offload.
