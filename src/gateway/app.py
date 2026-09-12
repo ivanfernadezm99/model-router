@@ -102,7 +102,7 @@ async def v1_proxy(path: str, request: Request):
         # if enqueued item already expired (should not happen immediately)
         latency_ms = int((time.monotonic() - start) * 1000)
         logger.info(json.dumps({"request_id": request_id, "hint": task, "target_model": target_model, "queue_depth": queue.depth(), "latency_ms": latency_ms, "queued": True}))
-        return JSONResponse(result, status_code=202, headers={"Retry-After": str(result["retry_after"])})
+        return JSONResponse(result, status_code=202, headers={"Retry-After": str(result["retry_after"]), "X-Queue-Depth": str(queue.depth()), "X-Target-Model": target_model})
 
     # if target equals active -> proxy directly (fast path)
     if orchestrator.active_model == target_model:
@@ -110,6 +110,20 @@ async def v1_proxy(path: str, request: Request):
         resp = await proxy_request(request, target_port)
         # attach fallback header if needed? normal path no fallback
         return resp
+
+    # if active is None but target port is already healthy (manual server), adopt it and proxy directly
+    if orchestrator.active_model is None:
+        try:
+            from src.orchestrator.health import poll_health
+
+            is_healthy = await poll_health(target_port, registry.resolve(target_model)["health_endpoint"], timeout_s=2)
+            if is_healthy:
+                orchestrator.active_model = target_model
+                orchestrator.active_service = registry.resolve(target_model)["service"]
+                resp = await proxy_request(request, target_port)
+                return resp
+        except Exception:
+            pass
 
     # mismatch -> need swap (stop-before-start). Hold queue swapping flag.
     # If active is None (idle), just start.
@@ -156,3 +170,16 @@ async def v1_proxy(path: str, request: Request):
         queue.clear_swapping()
         # after swap, if orchestrator set active, status becomes ready
         pass
+
+
+if __name__ == "__main__":
+    import argparse
+
+    import uvicorn
+
+    parser = argparse.ArgumentParser(description="model-router gateway")
+    parser.add_argument("--host", default="127.0.0.1", help="bind host (use 0.0.0.0 for Tailscale)")
+    parser.add_argument("--port", type=int, default=8000, help="bind port")
+    args = parser.parse_args()
+
+    uvicorn.run(app, host=args.host, port=args.port)

@@ -40,8 +40,16 @@ class Orchestrator:
         self.active_model: str | None = None
         self.active_service: str | None = None
 
-    def _check_holds(self) -> bool:
+    def _check_holds(self, target: str | None = None) -> bool:
         a, b = holds_ok()
+        # LLM (coder-*) only needs cuda hold; kornia is SDXL/ComfyUI specific (FX-8350 AVX2)
+        if target and target.startswith("coder"):
+            if not a:
+                logger.warning("holds missing cuda=%s kornia=%s — blocking swap for %s", a, b, target)
+                return False
+            if not b:
+                logger.info("kornia missing but target is %s — allowing LLM swap (cuda ok)", target)
+            return True
         if not (a and b):
             logger.warning("holds missing cuda=%s kornia=%s — blocking swap", a, b)
             return False
@@ -71,7 +79,7 @@ class Orchestrator:
         spec = self.registry.resolve(target)  # raises KeyError -> unknown model
         validate_np(spec.get("args", []))
 
-        if not self._check_holds():
+        if not self._check_holds(target):
             return False
 
         can, used = check_vram_for_model(spec["vram_mb"])

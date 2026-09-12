@@ -1,9 +1,10 @@
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, BackgroundTasks, HTTPException
 from pydantic import BaseModel, constr
 from typing import Dict, Any
 import json
 
 from src.jobs.queue import JobQueue
+from src.jobs.worker import _run_job_async
 
 router = APIRouter(prefix="/jobs")
 
@@ -36,7 +37,7 @@ class JobStatusResponse(BaseModel):
     error: Any | None = None
 
 @router.post("/image", status_code=202)
-async def enqueue_image_job(req: ImageJobRequest) -> Dict[str, Any]:
+async def enqueue_image_job(req: ImageJobRequest, background_tasks: BackgroundTasks) -> Dict[str, Any]:
     q = req.quality.lower()
     if q not in IMAGE_PRESETS:
         raise HTTPException(status_code=400, detail="quality must be draft|balanced|max")
@@ -48,14 +49,18 @@ async def enqueue_image_job(req: ImageJobRequest) -> Dict[str, Any]:
     if len(json.dumps(payload).encode("utf-8")) > MAX_PAYLOAD_SIZE:
         raise HTTPException(status_code=413, detail="Payload too large")
     job_id = queue.enqueue(payload)
+    # wire to Orchestrator via BackgroundTasks — shares VRAM lock with /v1
+    # so 5 videos +10 images via /jobs also serializes to 2 switches (wan-14b -> sdxl)
+    background_tasks.add_task(_run_job_async, job_id, "image", payload, queue)
     return {"id": job_id}
 
 @router.post("/video", status_code=202)
-async def enqueue_video_job(req: VideoJobRequest) -> Dict[str, str]:
+async def enqueue_video_job(req: VideoJobRequest, background_tasks: BackgroundTasks) -> Dict[str, str]:
     payload = {"prompt": req.prompt}
     if len(json.dumps(payload).encode("utf-8")) > MAX_PAYLOAD_SIZE:
         raise HTTPException(status_code=413, detail="Payload too large")
     job_id = queue.enqueue(payload)
+    background_tasks.add_task(_run_job_async, job_id, "video", payload, queue)
     return {"id": job_id}
 
 @router.get("/{job_id}")

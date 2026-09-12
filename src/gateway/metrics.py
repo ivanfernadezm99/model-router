@@ -7,6 +7,8 @@ def health_payload(orchestrator, queue) -> dict:
     vram = get_vram_used_mb()
     model = getattr(orchestrator, "active_model", None)
     depth = queue.depth() if queue else 0
+    coalesced = getattr(queue, "coalesced", 0) if queue else 0
+    swaps = getattr(queue, "swaps_total", 0) if queue else 0
     is_swapping = queue.is_swapping() if queue and hasattr(queue, "is_swapping") else False
     if model is None:
         status = "idle"
@@ -15,13 +17,14 @@ def health_payload(orchestrator, queue) -> dict:
     else:
         status = "ready"
     # vram_used_mb may be None -> null in json
-    return {"model": model, "vram_used_mb": vram, "queue_depth": depth, "status": status}
+    return {"model": model, "vram_used_mb": vram, "queue_depth": depth, "coalesced": coalesced, "swaps_total": swaps, "status": status}
 
 
 def metrics_text(orchestrator, queue) -> str:
     vram = get_vram_used_mb()
     depth = queue.depth() if queue else 0
     swaps = getattr(queue, "swaps_total", 0) if queue else 0
+    coalesced = getattr(queue, "coalesced", 0) if queue else 0
     vram_str = str(vram) if vram is not None else "0"
     lines = [
         "# HELP model_router_queue_depth current queue depth",
@@ -30,6 +33,9 @@ def metrics_text(orchestrator, queue) -> str:
         "# HELP model_router_swaps_total total swaps",
         "# TYPE model_router_swaps_total counter",
         f"model_router_swaps_total {swaps}",
+        "# HELP model_router_coalesced_total total coalesced requests",
+        "# TYPE model_router_coalesced_total counter",
+        f"model_router_coalesced_total {coalesced}",
         "# HELP model_router_vram_used_mb VRAM used in MB",
         "# TYPE model_router_vram_used_mb gauge",
         f"model_router_vram_used_mb {vram_str}",

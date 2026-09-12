@@ -69,19 +69,63 @@ curl -N http://127.0.0.1:8000/v1/chat/completions \
   -H "Content-Type: application/json" \
   -d '{"prompt":"code: fib","stream":true}'
 
-# cola durante swap → 202 + Retry-After
+# cola durante swap → 202 + Retry-After (contrato batch)
 curl -i http://127.0.0.1:8000/v1/chat/completions \
   -H "X-Model-Hint: image" -H "Content-Type: application/json" \
   -d '{"prompt":"image: dog"}'
 # HTTP/1.1 202 Accepted
 # Retry-After: 12
+# X-Queue-Depth: 3
+# X-Target-Model: sdxl
 # {"queued":true,"target":"sdxl","retry_after":12}
+# Cliente DEBE hacer: sleep(Retry-After + jitter 0..1s) → retry hasta 200 o 240s
+# Ver templates/batch_client.py para helper async con jitter
 
 # health / metrics
 curl -s http://127.0.0.1:8000/health
 # {"model":"sdxl","vram_used_mb":6800,"queue_depth":0,"status":"ready"}
 curl -s http://127.0.0.1:8000/metrics | grep model_router
 ```
+
+## Batch burst 5 videos + 10 imágenes — contrato
+
+El gateway **serializa** (1 modelo en VRAM). No hay paralelismo.
+
+```
+5 videos (wan-14b) + 10 imágenes (sdxl) al mismo ms:
+  1er video → lock → stop code → start wan-14b (~30-60s) → 200 proxy
+  otros 4 videos → 202 + Retry-After (mismo target wan-14b) → coalesce: 1 solo start, 4 esperan retry
+  10 imágenes → 202 encoladas (target sdxl)
+  cuando termina video, retry de image → stop wan → start sdxl → 200
+  9 imágenes restantes coalesceadas → 202 hasta retry → 200
+  Resultado: 2 switches (video→image), no 15. Drain FIFO <swap+5s.
+```
+
+Cliente **debe** manejar `202 → sleep(Retry-After+0..1s jitter) → retry` (ver `templates/batch_client.py`).
+Si mandás 5 videos exacto al mismo ms, 1 pasa y 4 reciben 202 — sin retry el batch parece "no andar".
+Límites: VRAM exclusiva, queue en memoria (no persiste), timeout hard 240s.
+
+## v1 vs /jobs — cuándo usar cada uno
+
+- **`POST /v1/*` (gateway síncrono)** → **usar para LLM (code) y para media síncrona**. Este es el que tiene `X-Model-Hint`, coalesce, `202 + Retry-After` y proxy streaming. **LLM SIEMPRE va por `/v1`** (`X-Model-Hint: code` o sin header, default code). Jobs NO es para LLM.
+- **`POST /jobs/image` y `POST /jobs/video` (async Redis)** → cola persistente para batches largos, devuelve `202 {id}` y se consulta con `GET /jobs/{id}`. **Ahora cableado al Orchestrator** (mismo `asyncio.Lock` y `switch_to` que `/v1`), así que `5 videos +10 imágenes` vía `/jobs` también serializa a 2 switches (`wan-14b → sdxl`) con estados `queued → running → completed/failed` en Redis (TTL 7d). Requiere `redis-server`/`valkey` en `:6379` (ya corre en este host). **Usar `/jobs` para batch async** (fire-and-forget + polling), **`/v1` para sync/LLM/streaming**.
+
+```bash
+# /jobs async batch (ahora sí funciona)
+curl -s http://127.0.0.1:8000/jobs/video -H "Content-Type: application/json" -d '{"prompt":"animate cat"}'
+# {"id":"a1b2c3..."}
+curl -s http://127.0.0.1:8000/jobs/a1b2c3... | jq
+# {"id":"...","status":"running","created_at":"..."} → luego "completed" con {"target":"wan-14b","payload":{...}}
+# para imágenes con calidad
+curl -s http://127.0.0.1:8000/jobs/image -H "Content-Type: application/json" -d '{"prompt":"cat in space","quality":"balanced"}'
+curl -s http://127.0.0.1:8000/jobs/image -H "Content-Type: application/json" -d '{"prompt":"cat","quality":"draft","width":512,"height":512,"steps":20}'
+
+# LLM arreglado — siempre por /v1 (no por /jobs)
+curl -s http://127.0.0.1:8000/v1/chat/completions -H "Content-Type: application/json" -d '{"prompt":"hola","stream":false}' | jq
+# default code → coder-14b-200k en :8082 (si no hay X-Model-Hint ni prefix)
+```
+
+**Diferencia clave**: `/v1` bloquea con `202 Retry-After` (cliente reintenta); `/jobs` devuelve `id` inmediato y el worker en `BackgroundTasks` hace `switch_to` con el mismo lock, así el cliente hace polling sin ocupar conexión.
 
 ## VRAM (RTX 3090 24 GB)
 
