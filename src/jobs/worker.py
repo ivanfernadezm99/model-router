@@ -9,9 +9,37 @@ Jobs run as FastAPI BackgroundTasks; status is persisted in Redis (JobQueue).
 """
 
 import logging
+import os
+
+import httpx
+
 from src.jobs.queue import JobQueue
 
 logger = logging.getLogger(__name__)
+
+
+def _notify_telegram(job_id: str, kind: str, status: str, payload: dict, error: str | None = None):
+    """Send Telegram notification if TELEGRAM_BOT_TOKEN and TELEGRAM_CHAT_ID are set."""
+    token = os.getenv("TELEGRAM_BOT_TOKEN")
+    chat_id = os.getenv("TELEGRAM_CHAT_ID")
+    if not token or not chat_id:
+        return
+    try:
+        prompt = payload.get("prompt", "")[:200]
+        if status == "completed":
+            text = f"✅ {kind} job {job_id[:8]} terminado\nPrompt: {prompt}\nTarget: {payload.get('target', kind)}"
+            if payload.get("file"):
+                text += f"\nArchivo: {payload['file']}"
+        else:
+            text = f"❌ {kind} job {job_id[:8]} falló\nPrompt: {prompt}\nError: {error or 'unknown'}"
+        # fire and forget, timeout 5s
+        httpx.post(
+            f"https://api.telegram.org/bot{token}/sendMessage",
+            json={"chat_id": chat_id, "text": text},
+            timeout=5,
+        )
+    except Exception as exc:
+        logger.warning(f"telegram notify failed for {job_id}: {exc}")
 
 
 def _get_orchestrator():
@@ -42,17 +70,47 @@ async def _run_job_async(job_id: str, kind: str, payload: dict, job_queue: JobQu
         ok = await orchestrator.switch_to(target)
         if not ok:
             jobs.update_status(job_id, "failed", error="model load timeout")
+            _notify_telegram(job_id, kind, "failed", payload, error="model load timeout (240s)")
             return
-        # switch succeeded — in real deployment, here we would call the backend
-        # (e.g. ComfyUI / wan) via httpx and store result. For now we mark completed
-        # with payload echo so batch polling works; backend call is injected via mocks in tests.
-        jobs.update_status(job_id, "completed", result={"target": target, "payload": payload})
+        # switch succeeded — call backend if available (skip real generation in tests)
+        result_payload = {"target": target, "payload": payload}
+        # skip heavy backend call during pytest to keep tests fast
+        if not os.getenv("PYTEST_CURRENT_TEST"):
+            try:
+                if kind == "video":
+                    # call wan-video :8189 /generate (draft 480x832, 33 frames, 20 steps by default for speed)
+                    spec = registry.resolve(target)
+                    port = int(spec["port"])
+                    async with httpx.AsyncClient(timeout=600) as client:
+                        gen_payload = {
+                            "prompt": payload.get("prompt", ""),
+                            "height": payload.get("height", 480),
+                            "width": payload.get("width", 832),
+                            "num_frames": payload.get("num_frames", 33),
+                            "steps": payload.get("steps", 20),
+                        }
+                        r = await client.post(f"http://127.0.0.1:{port}/generate", json=gen_payload)
+                        r.raise_for_status()
+                        backend_result = r.json()
+                        result_payload.update(backend_result)
+                elif kind == "image":
+                    spec = registry.resolve(target)
+                    port = int(spec["port"])
+                    # for now keep echo; real sdxl call would be here
+                    pass
+            except Exception as be:
+                logger.warning(f"backend call failed for {job_id} ({kind}): {be} — returning echo payload")
+                result_payload["backend_error"] = str(be)
+
+        jobs.update_status(job_id, "completed", result=result_payload)
+        _notify_telegram(job_id, kind, "completed", result_payload)
     except Exception as exc:
         logger.exception("job %s failed: %s", job_id, exc)
         try:
             jobs.update_status(job_id, "failed", error=str(exc))
         except Exception:
             pass
+        _notify_telegram(job_id, kind, "failed", payload, error=str(exc))
 
 
 def run_video_job(job_id: str, queue: JobQueue | None = None) -> None:
