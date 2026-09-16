@@ -5,15 +5,17 @@ import logging
 
 logger = logging.getLogger(__name__)
 
-ALLOWED = {"code", "image", "video"}
-# task -> registry model key (code uses defaults.model)
+ALLOWED = {"code", "image", "video", "i2v", "avatar"}
+# task -> registry model key (code uses coder-30b-a3b as default — best quality, 100K MoE)
 TASK_TO_MODEL = {
-    "code": "coder-14b-200k",
+    "code": "coder-30b-a3b",
     "image": "sdxl",
     "video": "wan-14b",
+    "i2v": "wan-i2v-14b",
+    "avatar": "echomimic-v2",
 }
 
-PREFIXES = ("code:", "image:", "video:")
+PREFIXES = ("code:", "image:", "video:", "i2v:", "avatar:")
 
 
 def _body_text(body: bytes | dict | str | None) -> str:

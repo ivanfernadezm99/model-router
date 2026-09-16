@@ -9,6 +9,8 @@ import httpx
 from fastapi import Request
 from fastapi.responses import Response, StreamingResponse
 
+from src.common.notify import notify_error
+
 logger = logging.getLogger(__name__)
 
 TIMEOUT_S = 240
@@ -68,6 +70,13 @@ async def proxy_request(request: Request, target_port: int, retry_after: int | N
                 "headers": _redact(dict(fwd_headers)),
             }))
 
+            # notify on backend 5xx — visible in Telegram + file log
+            if resp.status_code >= 500:
+                notify_error(
+                    f"Backend 5xx port {target_port}",
+                    f"request_id={request_id} status={resp.status_code} hint={hint} target={target_model}",
+                )
+
             # passthrough 500/502/504 verbatim, and any status
             # stream if backend is event-stream or request had stream:true
             ctype = resp.headers.get("content-type", "")
@@ -96,13 +105,25 @@ async def proxy_request(request: Request, target_port: int, retry_after: int | N
 
     except httpx.ReadTimeout:
         latency_ms = int((time.monotonic() - start) * 1000)
-        logger.warning(json.dumps({"request_id": request_id, "error": "timeout", "latency_ms": latency_ms}))
+        msg = json.dumps({"request_id": request_id, "error": "timeout", "latency_ms": latency_ms})
+        logger.warning(msg)
+        notify_error("Gateway timeout", f"request_id={request_id} target_port={target_port} latency={latency_ms}ms — httpx.ReadTimeout")
         return Response(content=json.dumps({"error": "model load timeout"}), status_code=504, media_type="application/json")
     except httpx.ConnectError:
         latency_ms = int((time.monotonic() - start) * 1000)
-        logger.warning(json.dumps({"request_id": request_id, "error": "connect", "latency_ms": latency_ms}))
+        msg = json.dumps({"request_id": request_id, "error": "connect", "latency_ms": latency_ms})
+        logger.warning(msg)
+        notify_error("Backend no conecta", f"request_id={request_id} target_port={target_port} — httpx.ConnectError")
         return Response(content=json.dumps({"error": "backend unavailable"}), status_code=502, media_type="application/json")
+    except httpx.ReadError as exc:
+        latency_ms = int((time.monotonic() - start) * 1000)
+        msg = json.dumps({"request_id": request_id, "error": f"read_error:{exc}", "latency_ms": latency_ms})
+        logger.warning(msg)
+        notify_error("Cliente cortó conexión", f"request_id={request_id} target_port={target_port} hint={hint} — httpx.ReadError: {exc} (opencode canceló 40k tokens?)")
+        return Response(content=json.dumps({"error": "client disconnected"}), status_code=499, media_type="application/json")
     except Exception as exc:
         latency_ms = int((time.monotonic() - start) * 1000)
-        logger.error(json.dumps({"request_id": request_id, "error": str(exc), "latency_ms": latency_ms}))
+        msg = json.dumps({"request_id": request_id, "error": str(exc), "latency_ms": latency_ms})
+        logger.error(msg)
+        notify_error("Gateway proxy error", f"request_id={request_id} target_port={target_port} — {exc}")
         return Response(content=json.dumps({"error": "proxy error"}), status_code=500, media_type="application/json")
