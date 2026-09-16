@@ -41,6 +41,12 @@ models:
     health_endpoint: /health
     vram_mb: 22000
     args: ["--model", "/home/servidor/Modelos/Qwen3-Coder/Qwen3-Coder-30B-A3B-Instruct-Q4_K_M.gguf", "-c", "190000", "-np", "1", "--ctx-size", "190000", "--rope-scaling", "yarn", "--yarn-orig-ctx", "32768", "-ctk", "q4_0", "-ctv", "q4_0", "-ngl", "99", "-np", "1", "--kv-unified", "--no-kv-offload", "--flash-attn", "on", "--jinja", "--chat-template-file", "/home/servidor/Descargas/model-router/templates/qwen25-coder-tools.jinja", "--alias", "local-template"]
+  coder-30b-q5-100k:
+    service: llama-code-30b-q5-100k.service
+    port: 8082
+    health_endpoint: /health
+    vram_mb: 23000
+    args: ["--model", "/home/servidor/Modelos/Qwen3-Coder/Qwen3-Coder-30B-A3B-Instruct-Q5_K_M.gguf", "-c", "100000", "-np", "1", "--ctx-size", "100000", "--rope-scaling", "yarn", "--yarn-orig-ctx", "32768", "-ctk", "q4_0", "-ctv", "q4_0", "-ngl", "99", "-np", "1", "--kv-unified", "--no-kv-offload", "--flash-attn", "on", "--jinja", "--chat-template-file", "/home/servidor/Descargas/model-router/templates/qwen25-coder-tools.jinja", "--alias", "local-template"]
   coder-q5-65k:
     service: llama-code-q5.service
     port: 8082
