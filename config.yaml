@@ -1,10 +1,40 @@
 models:
-  coder-14b-200k:
+  coder-14b-100k:
     service: llama-code-q4.service
     port: 8082
     health_endpoint: /health
     vram_mb: 20000
-    args: ["--model", "/home/servidor/Modelos/Qwen2.5-Coder-14B-Instruct-Q4_K_M.gguf", "-c", "131072", "-np", "1", "--ctx-size", "131072"]
+    args: ["--model", "/home/servidor/Modelos/Qwen2.5-Coder-14B-Instruct-Q4_K_M.gguf", "-c", "100000", "-np", "1", "--ctx-size", "100000"]
+  coder-14b-150k:
+    service: llama-code-150k.service
+    port: 8082
+    health_endpoint: /health
+    vram_mb: 19000
+    args: ["--model", "/home/servidor/Modelos/Qwen2.5-Coder-14B-Instruct-Q4_K_M.gguf", "-c", "150000", "-np", "1", "--ctx-size", "150000"]
+  coder-14b-190k:
+    service: llama-code-190k.service
+    port: 8082
+    health_endpoint: /health
+    vram_mb: 22000
+    args: ["--model", "/home/servidor/Modelos/Qwen2.5-Coder-14B-Instruct-Q4_K_M.gguf", "-c", "190000", "-np", "1", "--ctx-size", "190000"]
+  coder-14b-250k-ram:
+    service: llama-code-250k-ram.service
+    port: 8082
+    health_endpoint: /health
+    vram_mb: 12000
+    args: ["--model", "/home/servidor/Modelos/Qwen2.5-Coder-14B-Instruct-Q4_K_M.gguf", "-c", "250000", "-np", "1", "--ctx-size", "250000", "--no-kv-offload"]
+  coder-30b-a3b:
+    service: llama-code-30b-a3b.service
+    port: 8082
+    health_endpoint: /health
+    vram_mb: 12000
+    args: ["--model", "/home/servidor/Modelos/Qwen3-Coder/Qwen3-Coder-30B-A3B-Instruct-Q4_K_M.gguf", "-c", "100000", "-np", "1", "--ctx-size", "100000", "--no-kv-offload"]
+  coder-30b-150k:
+    service: llama-code-30b-150k.service
+    port: 8082
+    health_endpoint: /health
+    vram_mb: 18000
+    args: ["--model", "/home/servidor/Modelos/Qwen3-Coder/Qwen3-Coder-30B-A3B-Instruct-Q4_K_M.gguf", "-c", "150000", "-np", "1", "--ctx-size", "150000", "--rope-scaling", "yarn", "--yarn-orig-ctx", "32768", "-ctk", "q4_0", "-ctv", "q4_0", "-ngl", "99", "-np", "1", "--kv-unified", "--no-kv-offload", "--flash-attn", "on", "--jinja", "--chat-template-file", "/home/servidor/Descargas/model-router/templates/qwen25-coder-tools.jinja", "--alias", "local-template"]
   coder-q5-65k:
     service: llama-code-q5.service
     port: 8082
@@ -17,6 +47,18 @@ models:
     health_endpoint: /health
     vram_mb: 20000
     args: ["--host", "127.0.0.1", "--port", "8189"]
+  wan-i2v-14b:
+    service: wan-i2v.service
+    port: 8191
+    health_endpoint: /health
+    vram_mb: 20000
+    args: ["--host", "127.0.0.1", "--port", "8191"]
+  echomimic-v2:
+    service: echomimic.service
+    port: 8192
+    health_endpoint: /health
+    vram_mb: 8000
+    args: ["--host", "127.0.0.1", "--port", "8192"]
   sdxl:
     service: sdxl.service
     port: 8188
@@ -24,7 +66,7 @@ models:
     vram_mb: 6500
     args: ["--listen", "127.0.0.1", "--port", "8188"]
 defaults:
-  model: coder-14b-200k
+  model: coder-30b-a3b
   idle_timeout_seconds: 600
   swap_timeout_seconds: 240
   health_interval_seconds: 2
