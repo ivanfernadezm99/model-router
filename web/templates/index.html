@@ -1,0 +1,305 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Model Router</title>
+  <style>
+    :root { --bg:#0a0a0f; --bg-card:#12121a; --fg:#e0e0e0; --muted:#888; --accent:#00d4aa; --err:#ff5f57; --ok:#00e676; }
+    * { box-sizing: border-box; margin:0; padding:0; font-family: system-ui, sans-serif; }
+    body { background: var(--bg); color: var(--fg); min-height: 100vh; padding: 20px; line-height: 1.5; max-width: 900px; margin: 0 auto; }
+    h1 { color: var(--accent); margin-bottom: 4px; }
+    h2 { margin-bottom: 10px; font-size: 1.05em; }
+    .card { background: var(--bg-card); border-radius: 8px; padding: 15px; margin-bottom: 15px; border: 1px solid #2a2a3a; }
+    .muted { color: var(--muted); font-size: .85em; }
+    .small { font-size: .85em; }
+    label { display:block; margin: 10px 0 4px; color: var(--muted); font-size: .9em; }
+    select, textarea, input[type=file] { width: 100%; padding: 8px; background: #0d0d1a; border: 1px solid #3a3a4a; border-radius: 4px; color: var(--fg); font-size: 14px; }
+    textarea { min-height: 80px; resize: vertical; }
+    .btn { padding: 10px 16px; border: none; border-radius: 4px; cursor: pointer; font-weight: 600; background: var(--accent); color: #000; margin-top: 12px; }
+    .btn:disabled { opacity: .5; cursor: wait; }
+    #modelDesc { margin-top: 8px; padding: 8px 10px; border-left: 3px solid var(--accent); background: #0d0d1a; border-radius: 0 4px 4px 0; }
+    #jobStatus { margin-top: 10px; padding: 8px; border-radius: 4px; background: #0d0d1a; display: none; }
+    .queue-item { padding: 4px 6px; margin: 2px 0; border-radius: 3px; background: #1a1a2a; font-size: 12px; display:flex; align-items:center; gap:6px; }
+    .progress-bar { width:60px; height:8px; background:#333; border-radius:4px; overflow:hidden; flex-shrink:0; }
+    .progress-fill { height:100%; background:var(--accent); border-radius:4px; transition:width .3s; }
+    .err { color: var(--err); }
+    .ok { color: var(--ok); }
+    .row { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; }
+    @media (max-width: 700px) { .row { grid-template-columns: 1fr; } }
+  </style>
+</head>
+<body>
+  <h1>Model Router</h1>
+  <p class="muted">RTX 3090 24GB • VRAM exclusiva • Elegí modelo, escribí el prompt y adjuntá archivo si hace falta.</p>
+
+  <div class="card">
+    <h2>0. Modelo cargado en VRAM</h2>
+    <p class="muted small">Todos los del registry. Elegí uno y dale Cargar: hace el switch exclusivo (baja el anterior, sube este). Tarda hasta 4 min en modelos de ~20GB.</p>
+    <select id="activeModel"><option value="">Cargando modelos...</option></select>
+    <div id="activeDesc" class="small" style="margin-top:8px;padding:8px 10px;border-left:3px solid var(--accent);background:#0d0d1a;border-radius:0 4px 4px 0;"></div>
+    <button class="btn" id="loadBtn">Cargar en VRAM</button>
+    <div id="loadStatus" class="small" style="margin-top:8px;"></div>
+  </div>
+
+  <div class="card">
+    <h2>1. Elegí el modelo para el job</h2>
+    <select id="model">
+      <option value="video">🎥 video — Texto → Video (Wan T2V :8189)</option>
+      <option value="i2v">🖼️ i2v — Foto → Video animado (Wan I2V :8191)</option>
+      <option value="avatar">👤 avatar — Foto + audio → vos hablando (EchoMimicV2 :8192)</option>
+      <option value="image">🖌️ image — Crear / mejorar foto (SDXL :8188)</option>
+    </select>
+    <div id="modelDesc" class="small"></div>
+  </div>
+
+  <div class="card">
+    <h2>2. Prompt + archivos</h2>
+    <label for="prompt">Texto / prompt</label>
+    <textarea id="prompt" placeholder="Ej: cámara lenta recorre el POS... / Hola, les presento mi sistema..."></textarea>
+    <div id="imageWrap">
+      <label for="imageFile">Imagen o video (examinar)</label>
+      <input type="file" id="imageFile" accept="image/*,video/*">
+    </div>
+    <div id="audioWrap" style="display:none">
+      <label for="audioFile">Audio con tu voz (examinar, solo avatar)</label>
+      <input type="file" id="audioFile" accept="audio/*">
+    </div>
+    <div id="qualityWrap" style="display:none">
+      <label for="quality">Calidad SDXL</label>
+      <select id="quality">
+        <option value="draft">draft (rápido 512)</option>
+        <option value="balanced" selected>balanced (768)</option>
+        <option value="max">max (1024, lento)</option>
+      </select>
+    </div>
+    <button class="btn" id="sendBtn">Enviar job</button>
+    <div id="jobStatus"></div>
+  </div>
+
+  <div class="row">
+    <div class="card">
+      <h2>VRAM y estado</h2>
+      <div id="healthBox" class="small">Cargando...</div>
+    </div>
+    <div class="card">
+      <h2>Cola de jobs</h2>
+      <div id="queueBox" class="small">Cargando...</div>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>Logs y errores de carga</h2>
+    <button class="btn" id="logsBtn">Ver logs</button>
+    <div id="logsBox" class="small" style="margin-top:8px;display:none;max-height:300px;overflow-y:auto;background:#0d0d1a;padding:8px;border-radius:4px;white-space:pre-wrap;"></div>
+  </div>
+
+  <p class="muted small">Monitor simple: <a href="/monitor" style="color:var(--accent)">/monitor</a> • Tailscale: http://100.69.147.88:5000</p>
+
+  <script>
+    var DESCS = {
+      video: "Crea un video desde cero a partir de texto. Sin archivo: solo prompt. Ideal para escenas o fondos.",
+      i2v: "Anima tu foto o video: paneo / zoom cinematográfico con tu prompt. Adjuntá imagen o video como base.",
+      avatar: "Te hace hablar: adjuntá tu foto y un audio con tu voz + el texto. Genera cara/torso sincronizado.",
+      image: "Crea o mejora una foto: solo prompt para crear, o adjuntá foto + qué mejorar (luz, fondo, calidad)."
+    };
+    var modelEl = document.getElementById('model');
+    var descEl = document.getElementById('modelDesc');
+    var imageWrap = document.getElementById('imageWrap');
+    var audioWrap = document.getElementById('audioWrap');
+    var qualityWrap = document.getElementById('qualityWrap');
+    var sendBtn = document.getElementById('sendBtn');
+    var jobStatus = document.getElementById('jobStatus');
+    var healthBox = document.getElementById('healthBox');
+    var queueBox = document.getElementById('queueBox');
+    var currentJob = null, pollTimer = null;
+
+    function refreshModel() {
+      var m = modelEl.value;
+      descEl.textContent = DESCS[m] || '';
+      imageWrap.style.display = (m === 'video') ? 'none' : 'block';
+      audioWrap.style.display = (m === 'avatar') ? 'block' : 'none';
+      qualityWrap.style.display = (m === 'image') ? 'block' : 'none';
+    }
+    modelEl.addEventListener('change', refreshModel);
+    refreshModel();
+
+    function showJob(html) { jobStatus.style.display = 'block'; jobStatus.innerHTML = html; }
+
+    async function pollJob() {
+      if (!currentJob) return;
+      try {
+        var r = await fetch('/api/job/' + currentJob);
+        var d = await r.json();
+        var st = d.status || '?';
+        showJob('<strong>Job:</strong> ' + currentJob.substring(0, 8) + '...<br><strong>Estado:</strong> ' + st +
+          (d.error ? '<br><span class="err">' + d.error + '</span>' : '') +
+          (d.result && d.result.file ? '<br><span class="ok">Archivo: ' + d.result.file + '</span>' : ''));
+        if (st === 'completed' || st === 'failed') { clearInterval(pollTimer); pollTimer = null; loadQueue(); }
+      } catch (e) { showJob('<span class="err">Error consultando job: ' + e.message + '</span>'); }
+    }
+
+    sendBtn.addEventListener('click', async function() {
+      var prompt = document.getElementById('prompt').value.trim();
+      if (!prompt) { showJob('<span class="err">Escribí un prompt primero.</span>'); return; }
+      var fd = new FormData();
+      fd.append('model', modelEl.value);
+      fd.append('prompt', prompt);
+      fd.append('quality', document.getElementById('quality').value);
+      var img = document.getElementById('imageFile').files[0];
+      if (img) fd.append('image', img);
+      var aud = document.getElementById('audioFile').files[0];
+      if (aud) fd.append('audio', aud);
+      sendBtn.disabled = true; sendBtn.textContent = 'Enviando...';
+      showJob('Enviando al modelo <strong>' + modelEl.value + '</strong>...');
+      try {
+        var r = await fetch('/api/submit', { method: 'POST', body: fd });
+        var d = await r.json();
+        if (!r.ok) throw new Error(d.error || ('HTTP ' + r.status));
+        currentJob = d.job_id;
+        showJob('<strong>Job:</strong> ' + currentJob.substring(0, 8) + '...<br><strong>Modelo:</strong> ' + d.target + '<br>Estado: queued (consultando...)');
+        if (pollTimer) clearInterval(pollTimer);
+        pollTimer = setInterval(pollJob, 3000);
+        loadQueue();
+      } catch (e) { showJob('<span class="err">Error: ' + e.message + '</span>'); }
+      sendBtn.disabled = false; sendBtn.textContent = 'Enviar job';
+    });
+
+    async function loadHealth() {
+      try {
+        var r = await fetch('/api/health');
+        var d = await r.json();
+        var vram = d.vram_used_mb ? (d.vram_used_mb / 1024).toFixed(1) : '?';
+        healthBox.innerHTML = '<strong>Modelo:</strong> ' + (d.model || 'ninguno') + '<br><strong>VRAM:</strong> ' + vram + ' GB / 24 GB<br><strong>Estado:</strong> ' + (d.status || '?');
+      } catch (e) { healthBox.innerHTML = '<span class="err">Error router (' + e.message + ')</span>'; }
+    }
+    async function loadQueue() {
+      try {
+        var r = await fetch('/api/queue');
+        var d = await r.json();
+        if (d.jobs && d.jobs.length) {
+          var html = '';
+          d.jobs.forEach(function(j) {
+            var pct = j.progress != null ? j.progress : 0;
+            var bar = '<div class="progress-bar"><div class="progress-fill" style="width:' + pct + '%"></div></div>';
+            var extra = '';
+            if (j.status === 'queued' && j.eta_seconds) { var m = Math.round(j.eta_seconds / 60); extra = ' <span class="small" style="color:#888">ETA ~' + m + 'min</span>'; }
+            var link = '';
+            if (j.status === 'completed' && j.result && j.result.file) { link = ' <a href="/api/jobs/' + j.id + '/result" target="_blank" style="color:var(--accent)">archivo</a>'; }
+            html += '<div class="queue-item">' + bar + ' ' + (j.id || '?').substring(0, 8) + '... — ' + j.status + ' ' + pct + '%' + extra + link + '</div>';
+          });
+          queueBox.innerHTML = html;
+        } else { queueBox.innerHTML = d.message || 'Cola vacía'; }
+      } catch (e) { queueBox.innerHTML = '<span class="err">Error cola (' + e.message + ')</span>'; }
+    }
+    var activeSel = document.getElementById('activeModel');
+    var activeDesc = document.getElementById('activeDesc');
+    var loadBtn = document.getElementById('loadBtn');
+    var loadStatus = document.getElementById('loadStatus');
+    var MODELS_CACHE = [];
+
+    function fmtGB(mb) { return (mb / 1024).toFixed(1); }
+    function qualityTag(name, ctx) {
+      if (name.includes('30b-q5')) return '💎 Q5 máx calidad';
+      if (name === 'coder-30b-a3b' && ctx <= 100000) return '⭐ fino 100K';
+      if (name.includes('30b-150k')) return '🔥 150K medio';
+      if (name.includes('30b-190k')) return '⚡ 190K con pérdida';
+      if (name.includes('14b-100k')) return '✅ 14B 100K estable';
+      if (name.includes('14b-150k')) return '🔶 14B 150K medio';
+      if (name.includes('14b-190k')) return '⚠️ 14B 190K pérdida';
+      if (name.includes('250k')) return '🐢 250K RAM lento';
+      if (name.includes('q5-65k')) return 'Q5 65K corto';
+      return '';
+    }
+    function fmtCtxShort(ctx) {
+      if (!ctx) return '?';
+      return Math.round(ctx/1000) + 'K';
+    }
+    async function loadModels() {
+      try {
+        var r = await fetch('/api/models');
+        var d = await r.json();
+        MODELS_CACHE = d.models || [];
+        activeSel.innerHTML = '';
+        var hasActive = MODELS_CACHE.some(function(m){ return m.active; });
+        var saved = null; try { saved = localStorage.getItem('activeModel'); } catch(e) {}
+        var fallback = d.default_model || saved || null;
+        // sort: 30B Q4 primero (100/150/190), luego Q5, luego 14B
+        MODELS_CACHE.sort(function(a,b){
+          var order = ['coder-30b-a3b','coder-30b-150k','coder-30b-190k','coder-30b-q5-100k','coder-14b-100k','coder-14b-150k','coder-14b-190k','coder-14b-250k-ram','coder-q5-65k'];
+          var ia = order.indexOf(a.name); var ib = order.indexOf(b.name);
+          if (ia === -1) ia = 99; if (ib === -1) ib = 99;
+          return ia - ib;
+        });
+        MODELS_CACHE.forEach(function(m) {
+          var o = document.createElement('option');
+          o.value = m.name;
+          var q = qualityTag(m.name, m.ctx);
+          o.textContent = (m.active ? '● ' : '○ ') + m.name + ' — ' + fmtCtxShort(m.ctx) + ' ctx — ' + fmtGB(m.vram_mb || 0) + 'GB' + (q ? ' — ' + q : '') + (m.active ? ' [ACTIVO]' : '') + (m.name === d.default_model ? ' ★ default' : '');
+          if (m.active) o.selected = true;
+          else if (!hasActive && fallback && m.name === fallback) o.selected = true;
+          else if (!hasActive && !fallback && MODELS_CACHE[0] && m.name === MODELS_CACHE[0].name) o.selected = true;
+          activeSel.appendChild(o);
+        });
+        // si no había activo, respetamos fallback guardado/default sin sobreescribir localStorage aún
+        refreshActiveDesc();
+        if (!MODELS_CACHE.length) activeDesc.textContent = d.error || 'Sin modelos.';
+      } catch (e) { activeDesc.textContent = 'Error cargando modelos (' + e.message + ')'; }
+    }
+    function fmtCtx(ctx) {
+      if (!ctx) return '';
+      if (ctx >= 1000) return 'Contexto: ' + ctx + ' tokens (~' + Math.round(ctx / 1024) + 'k). ';
+      return 'Contexto: ' + ctx + ' tokens. ';
+    }
+    function refreshActiveDesc() {
+      var m = null;
+      for (var i = 0; i < MODELS_CACHE.length; i++) { if (MODELS_CACHE[i].name === activeSel.value) { m = MODELS_CACHE[i]; break; } }
+      if (!m) { activeDesc.textContent = ''; return; }
+      try { localStorage.setItem('activeModel', m.name); } catch(e) {}
+      activeDesc.textContent = (m.desc ? m.desc + ' ' : '') + fmtCtx(m.ctx) +
+        'Servicio ' + m.service + ', puerto ' + m.port + ', ' + fmtGB(m.vram_mb || 0) + 'GB VRAM.' +
+        (m.active ? ' Ya está cargado.' : ' Cargar lo sube con switch exclusivo.');
+    }
+    activeSel.addEventListener('change', refreshActiveDesc);
+    loadBtn.addEventListener('click', async function() {
+      var name = activeSel.value;
+      if (!name) return;
+      loadBtn.disabled = true; loadBtn.textContent = 'Cargando...';
+      loadStatus.textContent = 'Pidiendo switch a ' + name + '...';
+      try {
+        var r = await fetch('/api/switch', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ model: name }) });
+        var d = await r.json();
+        if (!r.ok) throw new Error(d.error || ('HTTP ' + r.status));
+        loadStatus.textContent = name + ': ' + (d.status === 'already_active' ? 'ya estaba activo.' : 'switcheando en background, mirá VRAM y estado (puede tardar minutos).');
+        loadModels(); loadHealth();
+      } catch (e) { loadStatus.innerHTML = '<span class="err">Error: ' + e.message + '</span>'; }
+      loadBtn.disabled = false; loadBtn.textContent = 'Cargar en VRAM';
+    });
+
+    var logsBtn = document.getElementById('logsBtn');
+    var logsBox = document.getElementById('logsBox');
+    logsBtn.addEventListener('click', async function() {
+      var show = logsBox.style.display === 'none';
+      logsBox.style.display = show ? 'block' : 'none';
+      logsBtn.textContent = show ? 'Ocultar logs' : 'Ver logs';
+      if (!show) return;
+      logsBox.textContent = 'Cargando logs...';
+      try {
+        var r = await fetch('/api/logs');
+        var d = await r.json();
+        var t = '== SWITCH ==\n' + JSON.stringify(d.switch || {}, null, 1);
+        t += '\n\n== JOBS FAILED ==\n' + JSON.stringify(d.jobs_failed || [], null, 1);
+        Object.keys(d.services || {}).forEach(function(u) {
+          t += '\n\n== ' + u + ' ==\n' + (d.services[u] || []).join('\n');
+        });
+        t += '\n\n== ROUTER LOG (' + (d.router_log_file || '?') + ') ==\n' + (d.router_log || []).join('');
+        logsBox.textContent = t;
+      } catch (e) { logsBox.textContent = 'Error trayendo logs: ' + e.message; }
+    });
+
+    loadModels();
+    loadHealth(); loadQueue();
+    setInterval(loadHealth, 5000); setInterval(loadQueue, 5000); setInterval(loadModels, 15000);
+  </script>
+</body>
+</html>
