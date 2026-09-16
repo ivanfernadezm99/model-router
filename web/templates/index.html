@@ -199,17 +199,32 @@
     var MODELS_CACHE = [];
 
     function fmtGB(mb) { return (mb / 1024).toFixed(1); }
+    function qualityScore(name, ctx) {
+      if (name.includes('30b-q5')) return 5.0;
+      if (name === 'coder-30b-a3b') return 5.0;
+      if (name.includes('30b-150k')) return 4.5;
+      if (name.includes('30b-190k')) return 4.0;
+      if (name.includes('14b-100k')) return 3.5;
+      if (name.includes('14b-150k')) return 3.0;
+      if (name.includes('14b-190k')) return 2.5;
+      if (name.includes('250k')) return 2.0;
+      if (name.includes('q5-65k')) return 2.0;
+      return 2.5;
+    }
     function qualityTag(name, ctx) {
-      if (name.includes('30b-q5')) return '💎 Q5 máx calidad';
-      if (name === 'coder-30b-a3b' && ctx <= 100000) return '⭐ fino 100K';
-      if (name.includes('30b-150k')) return '🔥 150K medio';
-      if (name.includes('30b-190k')) return '⚡ 190K con pérdida';
-      if (name.includes('14b-100k')) return '✅ 14B 100K estable';
-      if (name.includes('14b-150k')) return '🔶 14B 150K medio';
-      if (name.includes('14b-190k')) return '⚠️ 14B 190K pérdida';
-      if (name.includes('250k')) return '🐢 250K RAM lento';
-      if (name.includes('q5-65k')) return 'Q5 65K corto';
-      return '';
+      var s = qualityScore(name, ctx);
+      var base = '';
+      if (name.includes('30b-q5')) base = '💎 Q5 máx calidad';
+      else if (name === 'coder-30b-a3b' && ctx <= 100000) base = '⭐ fino';
+      else if (name.includes('30b-150k')) base = '🔥 medio';
+      else if (name.includes('30b-190k')) base = '⚡ con pérdida';
+      else if (name.includes('14b-100k')) base = '✅ 14B estable';
+      else if (name.includes('14b-150k')) base = '🔶 14B medio';
+      else if (name.includes('14b-190k')) base = '⚠️ 14B pérdida';
+      else if (name.includes('250k')) base = '🐢 RAM lento';
+      else if (name.includes('q5-65k')) base = 'Q5 corto';
+      else base = '';
+      return s.toFixed(1) + '/5 ' + base;
     }
     function fmtCtxShort(ctx) {
       if (!ctx) return '?';
@@ -235,7 +250,9 @@
           var o = document.createElement('option');
           o.value = m.name;
           var q = qualityTag(m.name, m.ctx);
-          o.textContent = (m.active ? '● ' : '○ ') + m.name + ' — ' + fmtCtxShort(m.ctx) + ' ctx — ' + fmtGB(m.vram_mb || 0) + 'GB' + (q ? ' — ' + q : '') + (m.active ? ' [ACTIVO]' : '') + (m.name === d.default_model ? ' ★ default' : '');
+          var score = qualityScore(m.name, m.ctx);
+          var stars = '★'.repeat(Math.round(score)) + '☆'.repeat(5 - Math.round(score));
+          o.textContent = (m.active ? '● ' : '○ ') + m.name + ' — ' + fmtCtxShort(m.ctx) + ' ctx — ' + fmtGB(m.vram_mb || 0) + 'GB — ' + q + ' ' + stars + (m.active ? ' [ACTIVO]' : '') + (m.name === d.default_model ? ' ★ default' : '');
           if (m.active) o.selected = true;
           else if (!hasActive && fallback && m.name === fallback) o.selected = true;
           else if (!hasActive && !fallback && MODELS_CACHE[0] && m.name === MODELS_CACHE[0].name) o.selected = true;
@@ -256,7 +273,11 @@
       for (var i = 0; i < MODELS_CACHE.length; i++) { if (MODELS_CACHE[i].name === activeSel.value) { m = MODELS_CACHE[i]; break; } }
       if (!m) { activeDesc.textContent = ''; return; }
       try { localStorage.setItem('activeModel', m.name); } catch(e) {}
+      var q = qualityTag(m.name, m.ctx);
+      var s = qualityScore(m.name, m.ctx);
+      var stars = '★'.repeat(Math.round(s)) + '☆'.repeat(5 - Math.round(s));
       activeDesc.textContent = (m.desc ? m.desc + ' ' : '') + fmtCtx(m.ctx) +
+        'Calidad: ' + q + ' ' + stars + '. ' +
         'Servicio ' + m.service + ', puerto ' + m.port + ', ' + fmtGB(m.vram_mb || 0) + 'GB VRAM.' +
         (m.active ? ' Ya está cargado.' : ' Cargar lo sube con switch exclusivo.');
     }
