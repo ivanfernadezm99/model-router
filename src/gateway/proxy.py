@@ -92,8 +92,17 @@ async def proxy_request(request: Request, target_port: int, retry_after: int | N
                     try:
                         async for chunk in resp.aiter_bytes():
                             yield chunk
+                    except httpx.ReadError as exc:
+                        # client (opencode) cancelled mid-stream — log + Telegram (throttled)
+                        logger.warning(json.dumps({"request_id": request_id, "error": f"stream_read_error:{exc}", "target": target_port}))
+                        notify_error("Stream cortado (opencode cancel)", f"request_id={request_id} target={target_port} hint={hint} — stream ReadError: {exc}")
+                    except Exception as exc:
+                        logger.warning(json.dumps({"request_id": request_id, "error": f"stream_error:{exc}", "target": target_port}))
                     finally:
-                        await resp.aclose()
+                        try:
+                            await resp.aclose()
+                        except Exception:
+                            pass
 
                 return StreamingResponse(aiter(), status_code=resp.status_code, headers=out_headers, media_type=ctype or "text/event-stream")
 
