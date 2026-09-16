@@ -122,7 +122,7 @@ curl -s http://127.0.0.1:8000/jobs/image -H "Content-Type: application/json" -d 
 
 # LLM arreglado — siempre por /v1 (no por /jobs)
 curl -s http://127.0.0.1:8000/v1/chat/completions -H "Content-Type: application/json" -d '{"prompt":"hola","stream":false}' | jq
-# default code → coder-14b-200k en :8082 (si no hay X-Model-Hint ni prefix)
+# default code → coder-14b-100k en :8082 (si no hay X-Model-Hint ni prefix)
 ```
 
 **Diferencia clave**: `/v1` bloquea con `202 Retry-After` (cliente reintenta); `/jobs` devuelve `id` inmediato y el worker en `BackgroundTasks` hace `switch_to` con el mismo lock, así el cliente hace polling sin ocupar conexión.

@@ -27,6 +27,24 @@
     .ok { color: var(--ok); }
     .row { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; }
     @media (max-width: 700px) { .row { grid-template-columns: 1fr; } }
+    /* Media viewer */
+    .media-preview { max-width: 100%; max-height: 260px; border-radius: 6px; margin-top: 10px; cursor: zoom-in; border: 1px solid #2a2a3a; display: block; }
+    video.media-preview { max-height: 320px; cursor: pointer; }
+    .media-actions { display:flex; gap:8px; margin-top:8px; flex-wrap:wrap; }
+    .btn-sm { padding: 6px 12px; border-radius: 4px; border: 1px solid #3a3a4a; cursor: pointer; font-size: 13px; font-weight: 600; }
+    .btn-sm.primary { background: var(--accent); color:#000; border-color: var(--accent); }
+    .btn-sm.ghost { background: #1a1a2a; color: var(--fg); }
+    .thumb { width: 72px; height: 54px; object-fit: cover; border-radius: 4px; border: 1px solid #2a2a3a; flex-shrink:0; cursor: zoom-in; background:#0d0d1a; }
+    .queue-item.has-thumb { align-items: flex-start; }
+    .queue-thumb-wrap { display:flex; align-items:center; gap:6px; }
+    /* Lightbox */
+    #lightbox { position: fixed; inset:0; background: rgba(0,0,0,0.88); display:none; align-items:center; justify-content:center; z-index: 9999; flex-direction: column; padding: 20px; }
+    #lightbox.open { display:flex; }
+    #lightboxContent { max-width: 92vw; max-height: 88vh; display:flex; align-items:center; justify-content:center; }
+    #lightboxContent img, #lightboxContent video { max-width: 92vw; max-height: 88vh; border-radius: 8px; box-shadow: 0 8px 32px rgba(0,0,0,0.6); }
+    #lightboxClose { position:absolute; top:16px; right:16px; background: rgba(255,255,255,0.12); border:1px solid rgba(255,255,255,0.2); color:#fff; font-size:20px; cursor:pointer; padding:8px 14px; border-radius:50%; line-height:1; }
+    #lightboxClose:hover { background: rgba(255,255,255,0.22); }
+    #lightboxCaption { position:absolute; bottom:18px; left:50%; transform:translateX(-50%); color:#aaa; font-size:12px; text-align:center; max-width:92vw; background: rgba(0,0,0,0.5); padding:4px 10px; border-radius:4px; }
   </style>
 </head>
 <body>
@@ -96,6 +114,13 @@
 
   <p class="muted small">Monitor simple: <a href="/monitor" style="color:var(--accent)">/monitor</a> • Tailscale: http://100.69.147.88:5000</p>
 
+  <!-- Lightbox para fotos/videos generados -->
+  <div id="lightbox" onclick="closeLightbox(event)">
+    <button id="lightboxClose" onclick="closeLightbox(event)" aria-label="Cerrar">✕</button>
+    <div id="lightboxContent"></div>
+    <div id="lightboxCaption"></div>
+  </div>
+
   <script>
     var DESCS = {
       video: "Crea un video desde cero a partir de texto. Sin archivo: solo prompt. Ideal para escenas o fondos.",
@@ -113,6 +138,54 @@
     var healthBox = document.getElementById('healthBox');
     var queueBox = document.getElementById('queueBox');
     var currentJob = null, pollTimer = null;
+
+    // --- Media viewer helpers ---
+    function isVideoFile(name) { return /\.(mp4|webm|mov|avi|mkv|m4v)$/i.test(name || ''); }
+    function escHtml(s) { return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;'); }
+    function escJs(s) { return String(s||'').replace(/\\/g,'\\\\').replace(/'/g,"\\'").replace(/"/g,'\\"').replace(/\n/g,'\\n'); }
+    function resultUrl(jobId) { return '/api/jobs/' + encodeURIComponent(jobId) + '/result'; }
+    function openLightbox(jobId, fileName) {
+      var url = resultUrl(jobId);
+      var isVid = isVideoFile(fileName);
+      var box = document.getElementById('lightbox');
+      var content = document.getElementById('lightboxContent');
+      var cap = document.getElementById('lightboxCaption');
+      content.innerHTML = '';
+      var el;
+      if (isVid) {
+        el = document.createElement('video');
+        el.src = url;
+        el.controls = true;
+        el.autoplay = true;
+        el.playsInline = true;
+      } else {
+        el = document.createElement('img');
+        el.src = url;
+        el.alt = fileName || jobId;
+      }
+      content.appendChild(el);
+      cap.textContent = (fileName || jobId) + ' — clic fuera o ESC para cerrar';
+      box.classList.add('open');
+      document.body.style.overflow = 'hidden';
+    }
+    function closeLightbox(e) {
+      if (e && e.target && e.target.id !== 'lightbox' && e.target.id !== 'lightboxClose' && e.type === 'click') return;
+      var box = document.getElementById('lightbox');
+      var content = document.getElementById('lightboxContent');
+      var v = content.querySelector('video');
+      if (v) { v.pause(); v.src=''; }
+      content.innerHTML = '';
+      box.classList.remove('open');
+      document.body.style.overflow = '';
+    }
+    document.addEventListener('keydown', function(e){ if(e.key==='Escape') closeLightbox({target:{id:'lightbox'}}); });
+    function mediaPreviewHtml(jobId, fileName, cssClass) {
+      var url = resultUrl(jobId);
+      var isVid = isVideoFile(fileName);
+      var cls = cssClass || 'media-preview';
+      if (isVid) return '<video class="' + cls + '" src="' + url + '" controls preload="metadata" onclick="openLightbox(\'' + escJs(jobId) + '\',\'' + escJs(fileName) + '\')"></video>';
+      return '<img class="' + cls + '" src="' + url + '" alt="' + escHtml(fileName) + '" loading="lazy" onclick="openLightbox(\'' + escJs(jobId) + '\',\'' + escJs(fileName) + '\')" />';
+    }
 
     function refreshModel() {
       var m = modelEl.value;
@@ -132,11 +205,26 @@
         var r = await fetch('/api/job/' + currentJob);
         var d = await r.json();
         var st = d.status || '?';
-        showJob('<strong>Job:</strong> ' + currentJob.substring(0, 8) + '...<br><strong>Estado:</strong> ' + st +
-          (d.error ? '<br><span class="err">' + d.error + '</span>' : '') +
-          (d.result && d.result.file ? '<br><span class="ok">Archivo: ' + d.result.file + '</span>' : ''));
+        var extra = '';
+        if (d.error) extra += '<br><span class="err">' + escHtml(d.error) + '</span>';
+        if (d.result && d.result.file) {
+          var f = d.result.file;
+          var fname = f.split('/').pop();
+          extra += '<br><span class="ok">Archivo: ' + escHtml(f) + '</span>';
+          extra += '<div class="media-actions">'
+            + '<button class="btn-sm primary" onclick="openLightbox(\'' + escJs(currentJob) + '\',\'' + escJs(fname) + '\')">👁️ Ver</button>'
+            + '<a class="btn-sm ghost" href="' + resultUrl(currentJob) + '" download="' + escHtml(fname) + '" style="text-decoration:none;display:inline-block">⬇️ Descargar</a>'
+            + '<a class="btn-sm ghost" href="' + resultUrl(currentJob) + '" target="_blank" style="text-decoration:none;display:inline-block">🔗 Abrir pestaña</a>'
+            + '</div>';
+          extra += mediaPreviewHtml(currentJob, fname, 'media-preview');
+        } else if (d.result && d.result.payload && d.result.payload.file) {
+          var f2 = d.result.payload.file;
+          var fname2 = String(f2).split('/').pop();
+          extra += '<br><span class="ok">Archivo: ' + escHtml(f2) + '</span>' + mediaPreviewHtml(currentJob, fname2, 'media-preview');
+        }
+        showJob('<strong>Job:</strong> ' + escHtml(currentJob.substring(0, 8)) + '...<br><strong>Estado:</strong> ' + escHtml(st) + extra);
         if (st === 'completed' || st === 'failed') { clearInterval(pollTimer); pollTimer = null; loadQueue(); }
-      } catch (e) { showJob('<span class="err">Error consultando job: ' + e.message + '</span>'); }
+      } catch (e) { showJob('<span class="err">Error consultando job: ' + escHtml(e.message) + '</span>'); }
     }
 
     sendBtn.addEventListener('click', async function() {
@@ -184,13 +272,32 @@
             var bar = '<div class="progress-bar"><div class="progress-fill" style="width:' + pct + '%"></div></div>';
             var extra = '';
             if (j.status === 'queued' && j.eta_seconds) { var m = Math.round(j.eta_seconds / 60); extra = ' <span class="small" style="color:#888">ETA ~' + m + 'min</span>'; }
-            var link = '';
-            if (j.status === 'completed' && j.result && j.result.file) { link = ' <a href="/api/jobs/' + j.id + '/result" target="_blank" style="color:var(--accent)">archivo</a>'; }
-            html += '<div class="queue-item">' + bar + ' ' + (j.id || '?').substring(0, 8) + '... — ' + j.status + ' ' + pct + '%' + extra + link + '</div>';
+            var isCompleted = j.status === 'completed' && j.result && (j.result.file || (j.result.payload && j.result.payload.file));
+            var fname = '';
+            if (j.result && j.result.file) fname = String(j.result.file).split('/').pop();
+            else if (j.result && j.result.payload && j.result.payload.file) fname = String(j.result.payload.file).split('/').pop();
+            var isVid = isVideoFile(fname);
+            var thumb = '';
+            var actions = '';
+            if (isCompleted) {
+              var url = resultUrl(j.id);
+              if (fname) {
+                if (isVid) thumb = '<video class="thumb" src="' + url + '" preload="metadata" muted onclick="openLightbox(\'' + escJs(j.id) + '\',\'' + escJs(fname) + '\')"></video>';
+                else thumb = '<img class="thumb" src="' + url + '" alt="' + escHtml(fname) + '" loading="lazy" onclick="openLightbox(\'' + escJs(j.id) + '\',\'' + escJs(fname) + '\')" />';
+              }
+              actions = '<button class="btn-sm primary" style="padding:3px 8px;font-size:11px" onclick="openLightbox(\'' + escJs(j.id) + '\',\'' + escJs(fname) + '\')">Ver</button>'
+                + '<a href="' + url + '" download="' + escHtml(fname) + '" class="btn-sm ghost" style="padding:3px 8px;font-size:11px;text-decoration:none">⬇️</a>';
+            } else if (j.status === 'completed' && j.result && j.result.file) {
+              // fallback
+              actions = '<a href="' + resultUrl(j.id) + '" target="_blank" style="color:var(--accent)">archivo</a>';
+            }
+            var thumbWrap = thumb ? '<div class="queue-thumb-wrap">' + thumb + '</div>' : '';
+            var cls = isCompleted && thumb ? 'queue-item has-thumb' : 'queue-item';
+            html += '<div class="' + cls + '">' + bar + thumbWrap + ' <span>' + escHtml((j.id || '?').substring(0, 8)) + '... — ' + escHtml(j.status) + ' ' + pct + '%' + extra + '</span> ' + actions + '</div>';
           });
           queueBox.innerHTML = html;
         } else { queueBox.innerHTML = d.message || 'Cola vacía'; }
-      } catch (e) { queueBox.innerHTML = '<span class="err">Error cola (' + e.message + ')</span>'; }
+      } catch (e) { queueBox.innerHTML = '<span class="err">Error cola (' + escHtml(e.message) + ')</span>'; }
     }
     var activeSel = document.getElementById('activeModel');
     var activeDesc = document.getElementById('activeDesc');
@@ -215,10 +322,10 @@
       var s = qualityScore(name, ctx);
       var base = '';
       if (name.includes('30b-q5')) base = '💎 Q5 máx calidad';
-      else if (name === 'coder-30b-a3b' && ctx <= 100000) base = '⭐ fino';
-      else if (name.includes('30b-150k')) base = '🔥 medio';
-      else if (name.includes('30b-190k')) base = '⚡ con pérdida';
-      else if (name.includes('14b-100k')) base = '✅ 14B estable';
+      else if (name === 'coder-30b-a3b' && ctx <= 100000) base = '⭐ fino — mejor calidad code';
+      else if (name.includes('30b-150k')) base = '🔥 medio — 30B 150K';
+      else if (name.includes('30b-190k')) base = '⚡ con pérdida — 30B 190K';
+      else if (name === 'coder-14b-100k') base = '✅ 14B estable 🤖 OPENCODE — estable para agents';
       else if (name.includes('14b-150k')) base = '🔶 14B medio';
       else if (name.includes('14b-190k')) base = '⚠️ 14B pérdida';
       else if (name.includes('250k')) base = '🐢 RAM lento';

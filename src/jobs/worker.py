@@ -45,12 +45,15 @@ def _notify_telegram(job_id: str, kind: str, status: str, payload: dict, error: 
 def _get_orchestrator():
     # lazy import to avoid circular import with gateway.app
     from src.gateway.app import orchestrator, registry
-
+    import logging
+    logger = logging.getLogger(__name__)
+    logger.info(f"_get_orchestrator: orchestrator id={id(orchestrator)} active_model={orchestrator.active_model}")
     return orchestrator, registry
 
 
 def _target_for_kind(kind: str) -> str:
-    return "wan-14b" if kind == "video" else "sdxl"
+    mapping = {"video": "wan-14b", "i2v": "wan-i2v-14b", "avatar": "echomimic-v2", "image": "sdxl"}
+    return mapping.get(kind, "sdxl")
 
 
 async def _run_job_async(job_id: str, kind: str, payload: dict, job_queue: JobQueue | None = None) -> None:
@@ -93,6 +96,33 @@ async def _run_job_async(job_id: str, kind: str, payload: dict, job_queue: JobQu
                         r.raise_for_status()
                         backend_result = r.json()
                         result_payload.update(backend_result)
+                elif kind == "i2v":
+                    spec = registry.resolve(target)
+                    port = int(spec["port"])
+                    async with httpx.AsyncClient(timeout=600) as client:
+                        gen_payload = {
+                            "prompt": payload.get("prompt", ""),
+                            "image": payload.get("image", ""),
+                            "height": payload.get("height", 480),
+                            "width": payload.get("width", 832),
+                            "num_frames": payload.get("num_frames", 33),
+                            "steps": payload.get("steps", 20),
+                        }
+                        r = await client.post(f"http://127.0.0.1:{port}/generate", json=gen_payload)
+                        r.raise_for_status()
+                        result_payload.update(r.json())
+                elif kind == "avatar":
+                    spec = registry.resolve(target)
+                    port = int(spec["port"])
+                    async with httpx.AsyncClient(timeout=600) as client:
+                        gen_payload = {
+                            "image": payload.get("image", ""),
+                            "audio": payload.get("audio", ""),
+                            "prompt": payload.get("prompt", ""),
+                        }
+                        r = await client.post(f"http://127.0.0.1:{port}/generate", json=gen_payload)
+                        r.raise_for_status()
+                        result_payload.update(r.json())
                 elif kind == "image":
                     spec = registry.resolve(target)
                     port = int(spec["port"])

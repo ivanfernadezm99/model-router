@@ -1,7 +1,7 @@
 import re
 import subprocess
 
-ALLOWED = {"127.0.0.1:8082/health", "127.0.0.1:8188/system_stats", "127.0.0.1:8189/health"}
+ALLOWED = {"127.0.0.1:8082/health", "127.0.0.1:8188/system_stats", "127.0.0.1:8189/health", "127.0.0.1:8191/health", "127.0.0.1:8192/health"}
 
 
 def validate_np(args: list[str]) -> None:
@@ -28,7 +28,7 @@ def validate_health(endpoint: str, port: int) -> None:
 def holds_ok() -> tuple[bool, bool]:
     try:
         h = subprocess.run(
-            ["apt-mark", "showhold"], capture_output=True, text=True, timeout=3
+            ["apt-mark", "showhold"], capture_output=True, text=True, timeout=10
         )
         txt = h.stdout.lower()
         # accept cuda-driver-580 or the expanded nvidia-driver-580 family (580 = CUDA 13.0, RTX 3090)
@@ -41,7 +41,7 @@ def holds_ok() -> tuple[bool, bool]:
         ok1 = False
     try:
         p = subprocess.run(
-            ["pip", "freeze"], capture_output=True, text=True, timeout=3
+            ["pip", "freeze"], capture_output=True, text=True, timeout=10
         )
         txt2 = p.stdout.lower()
         ok2 = "kornia==0.6.12" in txt2

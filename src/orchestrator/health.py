@@ -47,4 +47,10 @@ async def poll_health(
 
 
 def is_ready_status(status_code: int) -> bool:
+    """True when the service reports ready. 503 = still loading (not a failure)."""
     return status_code == 200
+
+
+def is_terminal_status(status_code: int) -> bool:
+    """True when the service reports a permanent failure (not transient loading)."""
+    return status_code >= 500 and status_code != 503

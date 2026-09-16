@@ -1,0 +1,132 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Model Router Monitor</title>
+  <style>
+    :root { --bg:#0a0a0f; --bg-card:#12121a; --fg:#e0e0e0; --muted:#666; --accent:#00d4aa; }
+    * { box-sizing: border-box; margin:0; padding:0; font-family: system-ui, sans-serif; }
+    body { background: var(--bg); color: var(--fg); min-height: 100vh; padding: 20px; line-height: 1.5; }
+    h1 { color: var(--accent); margin-bottom: 10px; }
+    .card { background: var(--bg-card); border-radius: 8px; padding: 15px; margin-bottom: 15px; border: 1px solid #2a2a3a; }
+    .form-group { margin-bottom: 15px; }
+    .form-group label { display: block; margin-bottom: 5px; color: var(--muted); }
+    .form-group input, .form-group select { width: 100%; padding: 8px; background: #0d0d1a; border: 1px solid #3a3a4a; border-radius: 4px; color: var(--fg); }
+    .btn { padding: 10px 16px; border: none; border-radius: 4px; cursor: pointer; font-size: 14px; font-weight: 600; background: var(--accent); color: #000; }
+    .btn:hover { background: #00f5c4; }
+    .muted { color: var(--muted); font-size: 0.85em; }
+    .small { font-size: 0.85em; }
+    .queue-list { max-height: 180px; overflow-y: auto; font-size: 12px; }
+    .queue-item { padding: 2px 4px; margin: 1px 0; border-radius: 3px; background: #1a1a2a; }
+    .status { padding: 8px 12px; border-radius: 4px; margin-top: 10px; display: none; }
+    .status.running { background: #1a3a2a; color: #00e676; border: 1px solid #00e676; }
+    .status.completed { background: #1a2a3a; color: #00c85d; border: 1px solid #00c85d; }
+    .status.failed { background: #3a1a1a; color: #ff5f57; border: 1px solid #ff5f57; }
+    .hidden { display: none !important; }
+    .thumb { width:64px; height:48px; object-fit:cover; border-radius:4px; cursor:zoom-in; border:1px solid #2a2a3a; }
+    #lightbox { position:fixed; inset:0; background:rgba(0,0,0,0.88); display:none; align-items:center; justify-content:center; z-index:9999; flex-direction:column; padding:20px; }
+    #lightbox.open { display:flex; }
+    #lightboxContent img, #lightboxContent video { max-width:92vw; max-height:88vh; border-radius:8px; }
+    #lightboxClose { position:absolute; top:16px; right:16px; background:rgba(255,255,255,0.12); border:1px solid rgba(255,255,255,0.2); color:#fff; font-size:20px; cursor:pointer; padding:8px 14px; border-radius:50%; }
+  </style>
+</head>
+<body>
+  <h1>Model Router Monitor</h1>
+  <p class="muted">RTX 3090 24GB • VRAM exclusiva por modelo • Jobs via ./*.sh scripts</p>
+  
+  <div class="card">
+    <h2>VRAM y Estado</h2>
+    <div id="statusBox">Cargando...</div>
+  </div>
+
+  <div class="card">
+    <h2>Cola de Jobs</h2>
+    <div id="queueList">Cargando cola...</div>
+  </div>
+
+  <div class="card">
+    <h2>Cómo Crear Jobs</h2>
+    <ul class="muted small">
+      <li>./video.sh "prompt"           → Texto → Video (:8189)</li>
+      <li>./i2v.sh foto.png "prompt"  → Foto → Video animado (:8191)</li>
+      <li>./avatar.sh foto.png audio.wav "texto" → Avatar hablante (:8192)</li>
+      <li>./mejorar.sh foto.png "mejora" → SDXL img2img (:8188)</li>
+    </ul>
+    <p class="muted small">Tailscale: http://100.69.147.88:5000</p>
+  </div>
+
+  <div id="lightbox" onclick="if(event.target.id==='lightbox')closeLb()">
+    <button id="lightboxClose" onclick="closeLb()">✕</button>
+    <div id="lightboxContent"></div>
+  </div>
+
+  <script>
+    function isVid(n){return /\.(mp4|webm|mov|avi|mkv)$/i.test(n||'');}
+    function esc(s){return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
+    function openLb(id, name){
+      var url='/api/jobs/'+encodeURIComponent(id)+'/result';
+      var c=document.getElementById('lightboxContent');
+      c.innerHTML='';
+      var el;
+      if(isVid(name)){ el=document.createElement('video'); el.src=url; el.controls=true; el.autoplay=true; }
+      else { el=document.createElement('img'); el.src=url; el.alt=name||id; }
+      c.appendChild(el);
+      document.getElementById('lightbox').classList.add('open');
+      document.body.style.overflow='hidden';
+    }
+    function closeLb(){ var b=document.getElementById('lightbox'); var c=document.getElementById('lightboxContent'); var v=c.querySelector('video'); if(v){v.pause();v.src='';} c.innerHTML=''; b.classList.remove('open'); document.body.style.overflow=''; }
+    document.addEventListener('keydown',function(e){if(e.key==='Escape')closeLb();});
+    // Mismo origen: Flask proxea al router en el servidor (evita CORS y 127.0.0.1 del cliente).
+    const statusBox = document.getElementById('statusBox');
+    const queueList = document.getElementById('queueList');
+
+    async function load() {
+      try {
+        const h = await fetch('/api/health');
+        if (!h.ok) throw new Error('health ' + h.status);
+        const d = await h.json();
+        const vramGB = d.vram_used_mb ? (d.vram_used_mb/1024).toFixed(1) : '?';
+        const modelName = d.model || 'ningún modelo';
+        statusBox.innerHTML =
+          '<strong>Modelo:</strong> ' + modelName + '<br>' +
+          '<strong>VRAM:</strong> ' + vramGB + ' GB / 24 GB<br>' +
+          '<strong>Estado:</strong> <span style="color:#00e676;">' + (d.status || '?') + '</span>';
+      } catch(e) {
+        statusBox.innerHTML = 'Error conectando con router (' + e.message + ')';
+      }
+
+      try {
+        const q = await fetch('/api/queue');
+        if (!q.ok) throw new Error('queue ' + q.status);
+        const d = await q.json();
+        if (d && d.jobs && d.jobs.length > 0) {
+          let html = '';
+          d.jobs.forEach(function(j) {
+            const st = j.status || '?';
+            const cls = st === 'running' ? 'running' : st === 'completed' ? 'completed' : st === 'failed' ? 'failed' : 'pending';
+            const jid = (j.id || j.job_id || '?').substring(0, 8);
+            const fullId = j.id || j.job_id || '?';
+            let fname = j.result && (j.result.file || (j.result.payload&&j.result.payload.file)) ? String(j.result.file||j.result.payload.file).split('/').pop() : '';
+            let thumb='', act='';
+            if(st==='completed' && fname){
+              let url='/api/jobs/'+encodeURIComponent(fullId)+'/result';
+              thumb = isVid(fname) ? '<video class="thumb" src="'+url+'" preload="metadata" muted onclick="openLb(\''+esc(fullId)+'\',\''+esc(fname)+'\')"></video>' : '<img class="thumb" src="'+url+'" onclick="openLb(\''+esc(fullId)+'\',\''+esc(fname)+'\')" />';
+              act = ' <button onclick="openLb(\''+esc(fullId)+'\',\''+esc(fname)+'\')" style="background:var(--accent);border:none;padding:2px 8px;border-radius:3px;cursor:pointer;font-size:11px">Ver</button> <a href="'+url+'" download="'+esc(fname)+'" style="color:var(--accent);font-size:11px">⬇️</a>';
+            }
+            html += '<div class="queue-item ' + cls + '" style="display:flex;align-items:center;gap:6px">' + thumb + '<span>' + esc(jid) + '... - ' + esc(j.target||'?') + ' - ' + esc(st) + '</span>' + act + '</div>';
+          });
+          queueList.innerHTML = html;
+        } else {
+          queueList.innerHTML = (d && d.message) || 'Ningún job en cola';
+        }
+      } catch(e) {
+        queueList.innerHTML = 'Error cargando cola (' + e.message + ')';
+      }
+    }
+
+    load();
+    setInterval(load, 3000);
+  </script>
+</body>
+</html>

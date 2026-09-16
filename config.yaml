@@ -78,7 +78,7 @@ models:
     vram_mb: 6500
     args: ["--listen", "127.0.0.1", "--port", "8188"]
 defaults:
-  model: coder-30b-a3b
+  model: coder-14b-100k  # 🤖 OPENCODE estable — default para agents, 30b queda manual via front
   idle_timeout_seconds: 600
   swap_timeout_seconds: 240
   health_interval_seconds: 2

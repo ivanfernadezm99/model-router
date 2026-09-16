@@ -31,6 +31,7 @@ except Exception as exc:
     logger.warning(f"registry load failed at import: {exc}")
 
 orchestrator = Orchestrator(registry=registry)
+logger.info(f"gateway: orchestrator created id={id(orchestrator)} module={__name__} file={__file__}")
 queue = GatewayQueue()
 reaper = IdleReaper(orchestrator)
 
@@ -48,8 +49,73 @@ app = FastAPI(lifespan=lifespan)
 app.include_router(job_router)
 
 
+@app.middleware("http")
+async def touch_reaper_on_every_request(request: Request, call_next):
+    """Reset idle reaper timer on ANY request (not just /v1 proxy)."""
+    reaper.touch()
+    return await call_next(request)
+
+
+@app.get("/debug/health")
+async def debug_health():
+    """Debug endpoint to check auto-detect state."""
+    result = {"active_model": orchestrator.active_model, "orchestrator_id": id(orchestrator), "registry_models": len(getattr(registry, "models", {}) or {})}
+    import subprocess
+    models = getattr(registry, "models", {}) or {}
+    for name, spec in models.items():
+        svc = spec.get("service")
+        if not svc:
+            continue
+        r = subprocess.run(
+            ["systemctl", "--user", "is-active", svc],
+            capture_output=True, text=True, timeout=2,
+            env={"XDG_RUNTIME_DIR": "/run/user/1000", "DBUS_SESSION_BUS_ADDRESS": "unix:path=/run/user/1000/bus"},
+        )
+        result[f"{name}_systemd"] = r.stdout.strip()
+    return result
+
+
 @app.get("/health")
 async def health():
+    # si active_model es None, adoptar el servicio systemd activo que esté
+    # saludable (no solo "active" en systemd, que puede estar cayendo).
+    if orchestrator.active_model is None:
+        logger.info("auto-detect: starting, active_model=None")
+        try:
+            import subprocess
+            import httpx
+            models = getattr(registry, "models", {}) or {}
+            logger.info(f"auto-detect: registry has {len(models)} models")
+            async with httpx.AsyncClient(timeout=3) as client:
+                for name, spec in models.items():
+                    svc = spec.get("service")
+                    port = spec.get("port")
+                    endpoint = spec.get("health_endpoint", "/health")
+                    if not svc or not port:
+                        continue
+                    r = subprocess.run(
+                        ["systemctl", "--user", "is-active", svc],
+                        capture_output=True, text=True, timeout=2,
+                        env={"XDG_RUNTIME_DIR": "/run/user/1000", "DBUS_SESSION_BUS_ADDRESS": "unix:path=/run/user/1000/bus"},
+                    )
+                    sysd_status = r.stdout.strip()
+                    logger.info(f"auto-detect: {name} svc={svc} systemd={sysd_status}")
+                    if sysd_status != "active":
+                        continue
+                    try:
+                        hr = await client.get(f"http://127.0.0.1:{port}{endpoint}")
+                        logger.info(f"auto-detect: {name} health={hr.status_code}")
+                        if hr.status_code == 200:
+                            orchestrator.active_model = name
+                            orchestrator.active_service = svc
+                            logger.info(f"auto-detect: adopted {name}")
+                            break
+                    except Exception as e:
+                        logger.info(f"auto-detect: {name} health error: {e}")
+                        continue
+            logger.info(f"auto-detect: final active_model={orchestrator.active_model}")
+        except Exception as e:
+            logger.info(f"auto-detect: exception: {e}")
     return JSONResponse(health_payload(orchestrator, queue))
 
 
@@ -113,6 +179,19 @@ async def v1_proxy(path: str, request: Request):
         latency_ms = int((time.monotonic() - start) * 1000)
         logger.info(json.dumps({"request_id": request_id, "hint": task, "target_model": target_model, "queue_depth": queue.depth(), "latency_ms": latency_ms, "status": resp.status_code}))
         return resp
+
+    # for code task: any coder* already loaded is ok — don't thrash between 14b/30b variants.
+    # Esto permite que el front elija manualmente 30b y opencode lo use sin que el gateway lo baje a 14b.
+    if task == "code" and orchestrator.active_model and orchestrator.active_model.startswith("coder"):
+        try:
+            active_spec = registry.resolve(orchestrator.active_model)
+            active_port = int(active_spec["port"])
+            resp = await proxy_request(request, active_port)
+            latency_ms = int((time.monotonic() - start) * 1000)
+            logger.info(json.dumps({"request_id": request_id, "hint": task, "target_model": target_model, "active_model": orchestrator.active_model, "queue_depth": queue.depth(), "latency_ms": latency_ms, "status": resp.status_code, "coder_passthrough": True}))
+            return resp
+        except Exception:
+            pass  # fall through to normal switch
 
     # if active is None but target port is already healthy (manual server), adopt it and proxy directly
     if orchestrator.active_model is None:

@@ -57,7 +57,7 @@ MODEL_DESCS = {
     "coder-30b-150k": "🔥 Qwen3-Coder-30B-A3B 150K — mismo MoE 30B pero ventana extendida 150K para trabajos largos. YaRN 4.6x, ~20GB VRAM. Más contexto, leve pérdida vs 100K. Va por gateway /v1.",
     "coder-30b-190k": "⚡ Qwen3-Coder-30B-A3B 190K — tope VRAM 30B, ~22GB, YaRN 5.9x. Para trabajos muy largos, deja 2GB libres. Calidad con algo de pérdida pero usable. Va por gateway /v1.",
     "coder-30b-q5-100k": "💎 Qwen3-Coder-30B-A3B Q5 100K — mismo 30B pero Q5_K_M (21GB) mejor calidad que Q4. Si no entra en VRAM, KV va a RAM. Más preciso, deja ~1GB libre. Va por gateway /v1.",
-    "coder-14b-100k": "Código y chat con Qwen2.5-Coder-14B (Q4). Estable 100K todo en GPU. Backup verificado. Va por gateway /v1.",
+    "coder-14b-100k": "🤖 OPENCODE — Qwen2.5-Coder-14B (Q4) 100K todo en GPU. El que andaba para opencode: rápido, estable, tool-calling con plantilla Jinja, sin KV en RAM. Recomendado para agents (explore/general). Va por gateway /v1.",
     "coder-14b-150k": "Intermedia: mismo 14B, 150K todo en GPU. Rápida, sin usar RAM. Va por gateway /v1.",
     "coder-14b-190k": "Tope GPU del 14B: 190K todo en VRAM (~21GB). Al límite, margen ~3GB. Va por gateway /v1.",
     "coder-14b-250k-ram": "250K con KV en RAM (--no-kv-offload). GPU ~11GB, KV ~14GB en RAM. Solo para contextos ultra-largos, lento por PCIe y YaRN 7.6x. Va por gateway /v1.",
@@ -203,9 +203,39 @@ def job_status(job_id):
 @app.route("/api/jobs/<job_id>/result")
 def job_result(job_id):
     try:
-        resp = requests.get(f"{ROUTER_BASE}/jobs/{job_id}/result", timeout=30)
-        if resp.status_code == 200:
-            return resp.content, 200, {"Content-Type": resp.headers.get("content-type", "application/octet-stream")}
+        # stream to support video seeking without loading whole file in memory
+        # forward Range header so <video> seeking works (206 Partial Content)
+        fwd_headers = {}
+        rng = request.headers.get("Range")
+        if rng:
+            fwd_headers["Range"] = rng
+        resp = requests.get(f"{ROUTER_BASE}/jobs/{job_id}/result", timeout=30, stream=True, headers=fwd_headers)
+        if resp.status_code in (200, 206):
+            from flask import Response
+
+            headers = {}
+            ct = resp.headers.get("content-type", "application/octet-stream")
+            headers["Content-Type"] = ct
+            # let browser display inline (lightbox <img>/<video>), not force download
+            # download is triggered via <a download> on the frontend
+            if resp.headers.get("content-disposition"):
+                headers["Content-Disposition"] = resp.headers.get("content-disposition").replace("attachment", "inline")
+            else:
+                # fallback: inline without filename, frontend supplies download attr
+                headers["Content-Disposition"] = "inline"
+            for hk in ("content-length", "content-range", "accept-ranges", "etag", "last-modified"):
+                if resp.headers.get(hk):
+                    headers[hk] = resp.headers.get(hk)
+            headers["Cache-Control"] = "public, max-age=3600"
+            if "accept-ranges" not in (k.lower() for k in headers):
+                headers["Accept-Ranges"] = "bytes"
+
+            def generate():
+                for chunk in resp.iter_content(chunk_size=8192):
+                    if chunk:
+                        yield chunk
+
+            return Response(generate(), status=resp.status_code, headers=headers)
         return jsonify({"error": resp.text[:200]}), resp.status_code
     except Exception as e:
         return jsonify({"error": str(e)}), 502

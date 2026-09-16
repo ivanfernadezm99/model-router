@@ -6,9 +6,9 @@ import logging
 logger = logging.getLogger(__name__)
 
 ALLOWED = {"code", "image", "video", "i2v", "avatar"}
-# task -> registry model key (code uses coder-30b-a3b as default — best quality, 100K MoE)
+# task -> registry model key (code usa coder-14b-100k para opencode — estable y rápido; 30b queda para uso manual via front)
 TASK_TO_MODEL = {
-    "code": "coder-30b-a3b",
+    "code": "coder-14b-100k",
     "image": "sdxl",
     "video": "wan-14b",
     "i2v": "wan-i2v-14b",

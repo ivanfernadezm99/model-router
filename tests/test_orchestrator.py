@@ -184,8 +184,42 @@ async def test_exclusive_stop_before_start():
                     with patch("src.orchestrator.lifecycle.poll_health", new_callable=AsyncMock, return_value=True):
                         ok = await orch.switch_to("sdxl")
                         assert ok is True
+                        # stop-before-start + misma-puerto: frena activo y
+                        # re-frena el propio target por si quedó de un intento previo
                         assert order[0] == "stop:llama-code-q4.service"
-                        assert order[1] == "start:sdxl.service"
+                        assert order[1] == "stop:sdxl.service"
+                        assert order[2] == "start:sdxl.service"
+
+
+@pytest.mark.asyncio
+async def test_orphan_port_occupant_killed():
+    """Puerto ocupado tras frenar services conocidos -> fuser -k al huérfano
+    y el switch sigue. Sin esto, bind failed + health al impostor."""
+    registry = MagicMock()
+    registry.resolve.return_value = {
+        "service": "sdxl.service",
+        "port": 8188,
+        "health_endpoint": "/system_stats",
+        "vram_mb": 6500,
+        "args": [],
+    }
+    registry.models = {"sdxl": {"service": "sdxl.service", "port": 8188}}
+    orch = Orchestrator(registry=registry)
+
+    with patch("src.orchestrator.lifecycle._run_systemctl"):
+        with patch("src.orchestrator.lifecycle.get_vram_used_mb", return_value=500):
+            with patch("src.orchestrator.lifecycle.check_vram_for_model", return_value=(True, 500)):
+                with patch("src.orchestrator.lifecycle.holds_ok", return_value=(True, True)):
+                    with patch("src.orchestrator.lifecycle.poll_health", new_callable=AsyncMock, return_value=True):
+                        with patch(
+                            "src.orchestrator.lifecycle.wait_port_free",
+                            new_callable=AsyncMock,
+                            side_effect=[False, True],
+                        ):
+                            with patch("src.orchestrator.lifecycle._kill_port_occupants", return_value=True) as killer:
+                                ok = await orch.switch_to("sdxl")
+                                assert ok is True
+                                killer.assert_called_once_with(8188)
 
 
 @pytest.mark.asyncio
