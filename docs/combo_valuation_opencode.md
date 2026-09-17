@@ -42,6 +42,11 @@ Que el combo `0. Modelo cargado en VRAM` siempre muestre:
 - **Gateway** `src/gateway/proxy.py` `TIMEOUT_S=600`, `src/orchestrator/health.py` `HARD_TIMEOUT_S=600 NOMINAL=300`
 - Reiniciar gateway: `systemctl --user restart model-router-gateway` y opencode
 
+## Outputs en disco grande (2026-09-17)
+- **Carpeta:** `/media/servidor/d0a196c3-2d36-4431-b15d-8ea078ad8222/model-router-output` (375G libres, ext4)
+- **`src/jobs/worker.py`:** `OUTPUT_DIR` + `_move_file_to_output(job_id, payload)` copia todo `file/video_path/image_path` del backend al disco grande con prefijo `job_id_`, actualiza `payload["file"]` para que el front lo sirva vía `FileResponse inline`
+- **Front:** visor con `lightbox` + `thumb` usa `GET /api/jobs/<id>/result` que ya sirve `inline` desde el nuevo path
+
 ## Operación
 - Reiniciar web tras editar `index.html`: `kill $(lsof -ti:5000); nohup python3 web/app.py &`
 - Switch fiable: `curl -X POST http://127.0.0.1:8000/jobs/switch -d '{"model":"coder-30b-a3b"}'` tarda 60-138s, el bench lo espera.

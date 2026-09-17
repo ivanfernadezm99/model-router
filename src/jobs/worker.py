@@ -10,12 +10,54 @@ Jobs run as FastAPI BackgroundTasks; status is persisted in Redis (JobQueue).
 
 import logging
 import os
+import shutil
 
 import httpx
 
 from src.jobs.queue import JobQueue
 
 logger = logging.getLogger(__name__)
+
+# disco con más espacio libre (375G) para outputs generados
+OUTPUT_DIR = "/media/servidor/d0a196c3-2d36-4431-b15d-8ea078ad8222/model-router-output"
+os.makedirs(OUTPUT_DIR, exist_ok=True)
+
+
+def _move_file_to_output(job_id: str, payload: dict) -> None:
+    """Si el backend devolvió un file en disco, lo copia al OUTPUT_DIR del disco grande."""
+    candidates = []
+    for k in ("file", "video_path", "image_path", "output", "path", "video", "image", "result"):
+        v = payload.get(k)
+        if isinstance(v, str) and v and os.path.exists(v) and os.path.isfile(v):
+            candidates.append((k, v))
+    # también busca file anidado en payload interno
+    if not candidates:
+        for k, v in list(payload.items()):
+            if isinstance(v, dict):
+                for kk in ("file", "path"):
+                    vv = v.get(kk)
+                    if isinstance(vv, str) and vv and os.path.exists(vv):
+                        candidates.append((k, vv))
+    if not candidates:
+        return
+    # toma el primero
+    key, src = candidates[0]
+    try:
+        # si ya está en OUTPUT_DIR, solo normaliza a payload["file"]
+        if os.path.commonpath([os.path.abspath(src), os.path.abspath(OUTPUT_DIR)]) == os.path.abspath(OUTPUT_DIR):
+            payload["file"] = src
+            return
+        basename = os.path.basename(src)
+        dst = os.path.join(OUTPUT_DIR, f"{job_id}_{basename}")
+        if os.path.abspath(src) != os.path.abspath(dst):
+            shutil.copy2(src, dst)
+            logger.info(f"copied output {src} -> {dst} for job {job_id}")
+        payload["file"] = dst
+        if key != "file":
+            payload[f"orig_{key}"] = src
+    except Exception as e:
+        logger.warning(f"failed to move {src} to output dir: {e}")
+        payload["file"] = src
 
 
 def _notify_telegram(job_id: str, kind: str, status: str, payload: dict, error: str | None = None):
@@ -131,6 +173,9 @@ async def _run_job_async(job_id: str, kind: str, payload: dict, job_queue: JobQu
             except Exception as be:
                 logger.warning(f"backend call failed for {job_id} ({kind}): {be} — returning echo payload")
                 result_payload["backend_error"] = str(be)
+
+        # mueve archivos generados al disco grande si hace falta
+        _move_file_to_output(job_id, result_payload)
 
         jobs.update_status(job_id, "completed", result=result_payload)
         _notify_telegram(job_id, kind, "completed", result_payload)
