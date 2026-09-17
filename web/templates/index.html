@@ -58,6 +58,14 @@
     <div id="activeDesc" class="small" style="margin-top:8px;padding:8px 10px;border-left:3px solid var(--accent);background:#0d0d1a;border-radius:0 4px 4px 0;"></div>
     <button class="btn" id="loadBtn">Cargar en VRAM</button>
     <div id="loadStatus" class="small" style="margin-top:8px;"></div>
+    <div id="switchProgress" style="display:none; margin-top:8px;">
+      <div style="display:flex; align-items:center; gap:8px;">
+        <div class="progress-bar" style="width:140px; height:10px;"><div id="switchFill" class="progress-fill" style="width:0%"></div></div>
+        <span id="switchPct" class="small"></span>
+        <span id="switchElapsed" class="small muted"></span>
+      </div>
+      <div id="switchDetail" class="small muted" style="margin-top:4px;"></div>
+    </div>
   </div>
 
   <div class="card">
@@ -303,8 +311,76 @@
     var activeDesc = document.getElementById('activeDesc');
     var loadBtn = document.getElementById('loadBtn');
     var loadStatus = document.getElementById('loadStatus');
+    var switchProgress = document.getElementById('switchProgress');
+    var switchFill = document.getElementById('switchFill');
+    var switchPct = document.getElementById('switchPct');
+    var switchElapsed = document.getElementById('switchElapsed');
+    var switchDetail = document.getElementById('switchDetail');
+    var switchTimer = null;
+    var switchStartedAt = null;
     var MODELS_CACHE = [];
 
+    function getExpectedLoadTime(name) {
+      if (name.includes('30b-a3b')) return 130;
+      if (name.includes('30b-150k')) return 140;
+      if (name.includes('30b-190k')) return 150;
+      if (name.includes('30b-q5')) return 140;
+      if (name.includes('14b-100k')) return 60;
+      if (name.includes('14b-150k')) return 70;
+      if (name.includes('14b-190k')) return 90;
+      if (name.includes('250k')) return 100;
+      return 90;
+    }
+    function stopSwitchPolling() {
+      if (switchTimer) { clearInterval(switchTimer); switchTimer = null; }
+    }
+    async function pollSwitchStatus() {
+      if (!switchStartedAt) return;
+      try {
+        var r = await fetch('/api/switch-status');
+        var d = await r.json();
+        var st = d.status || 'unknown';
+        var elapsed = Math.floor((Date.now() - switchStartedAt) / 1000);
+        var expected = getExpectedLoadTime(d.model || activeSel.value);
+        var pct = st === 'active' || st === 'already_active' ? 100 : Math.min(95, Math.floor((elapsed / expected) * 100));
+        // si está switching, también usa VRAM como hint: si VRAM sube, no está colgado
+        switchFill.style.width = pct + '%';
+        switchPct.textContent = pct + '%';
+        switchElapsed.textContent = elapsed + 's / ~' + expected + 's';
+        var detail = (d.model || '') + ': ' + st + (d.detail ? ' — ' + d.detail : '');
+        // añade VRAM actual si está disponible
+        try {
+          var hr = await fetch('/api/health');
+          var hd = await hr.json();
+          if (hd.vram_used_mb != null) detail += ' • VRAM ' + (hd.vram_used_mb/1024).toFixed(1) + 'GB';
+          if (hd.status) detail += ' • ' + hd.status;
+        } catch(e) {}
+        switchDetail.textContent = detail;
+        if (st === 'active' || st === 'already_active' || st === 'failed') {
+          stopSwitchPolling();
+          switchFill.style.width = (st === 'failed' ? pct : 100) + '%';
+          if (st === 'active') { switchDetail.textContent += ' ✓ cargado'; loadStatus.innerHTML = '<span class="ok">✓ ' + (d.model||'') + ' cargado OK</span>'; }
+          if (st === 'failed') { switchDetail.innerHTML += ' <span class="err">✗ falló — ver Logs</span>'; loadStatus.innerHTML = '<span class="err">✗ ' + escHtml(d.detail||'falló') + '</span>'; }
+          loadBtn.disabled = false; loadBtn.textContent = 'Cargar en VRAM';
+          loadModels(); loadHealth();
+          // oculta barra después de 4s si éxito
+          if (st === 'active' || st === 'already_active') setTimeout(function(){ switchProgress.style.display='none'; }, 4000);
+        }
+      } catch(e) {
+        switchDetail.textContent = 'Error consultando switch: ' + e.message;
+      }
+    }
+    function startSwitchPolling(modelName) {
+      stopSwitchPolling();
+      switchStartedAt = Date.now();
+      switchProgress.style.display = 'block';
+      switchFill.style.width = '5%';
+      switchPct.textContent = '5%';
+      switchElapsed.textContent = '0s';
+      switchDetail.textContent = modelName + ': iniciando...';
+      pollSwitchStatus();
+      switchTimer = setInterval(pollSwitchStatus, 2000);
+    }
     function fmtGB(mb) { return (mb / 1024).toFixed(1); }
     function qualityScore(name, ctx) {
       if (name.includes('30b-q5')) return 5.0;
@@ -394,14 +470,27 @@
       if (!name) return;
       loadBtn.disabled = true; loadBtn.textContent = 'Cargando...';
       loadStatus.textContent = 'Pidiendo switch a ' + name + '...';
+      switchProgress.style.display = 'none';
+      stopSwitchPolling();
       try {
         var r = await fetch('/api/switch', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ model: name }) });
         var d = await r.json();
         if (!r.ok) throw new Error(d.error || ('HTTP ' + r.status));
-        loadStatus.textContent = name + ': ' + (d.status === 'already_active' ? 'ya estaba activo.' : 'switcheando en background, mirá VRAM y estado (puede tardar minutos).');
-        loadModels(); loadHealth();
-      } catch (e) { loadStatus.innerHTML = '<span class="err">Error: ' + e.message + '</span>'; }
-      loadBtn.disabled = false; loadBtn.textContent = 'Cargar en VRAM';
+        if (d.status === 'already_active') {
+          loadStatus.innerHTML = '<span class="ok">✓ ' + escHtml(name) + ' ya estaba activo.</span>';
+          switchProgress.style.display = 'none';
+          loadBtn.disabled = false; loadBtn.textContent = 'Cargar en VRAM';
+          loadModels(); loadHealth();
+        } else {
+          loadStatus.textContent = name + ': cargando...';
+          startSwitchPolling(name);
+          // no re-habilitas el botón acá, lo hace pollSwitchStatus al terminar
+        }
+      } catch (e) {
+        loadStatus.innerHTML = '<span class="err">Error: ' + escHtml(e.message) + '</span>';
+        switchProgress.style.display = 'none';
+        loadBtn.disabled = false; loadBtn.textContent = 'Cargar en VRAM';
+      }
     });
 
     var logsBtn = document.getElementById('logsBtn');
@@ -427,6 +516,8 @@
 
     loadModels();
     loadHealth(); loadQueue();
+    // si ya hay switch en curso al cargar, auto-muestra progreso
+    (async function(){ try{ var r=await fetch('/api/switch-status'); var d=await r.json(); if(d.status==='switching' && d.model){ loadStatus.textContent = d.model+': cargando...'; startSwitchPolling(d.model); switchStartedAt = d.started_at ? new Date(d.started_at).getTime() : Date.now(); } }catch(e){} })();
     setInterval(loadHealth, 5000); setInterval(loadQueue, 5000); setInterval(loadModels, 15000);
   </script>
 </body>
