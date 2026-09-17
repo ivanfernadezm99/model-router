@@ -37,6 +37,11 @@ Que el combo `0. Modelo cargado en VRAM` siempre muestre:
 `pytest tests/test_opencode_valuation.py` — 9 tests que fallan si se borra la valoración o el tag OPENCODE.
 `pytest tests/test_gateway.py::test_task_to_model` — asegura code sigue mapeando a 14b.
 
+## Timeout para LLMs lentos (2026-09-16)
+- **Opencode** `~/.config/opencode/opencode.json`: `provider.llm-local.options.timeout/headerTimeout/chunkTimeout = 600000` (10min, default 300000)
+- **Gateway** `src/gateway/proxy.py` `TIMEOUT_S=600`, `src/orchestrator/health.py` `HARD_TIMEOUT_S=600 NOMINAL=300`
+- Reiniciar gateway: `systemctl --user restart model-router-gateway` y opencode
+
 ## Operación
 - Reiniciar web tras editar `index.html`: `kill $(lsof -ti:5000); nohup python3 web/app.py &`
 - Switch fiable: `curl -X POST http://127.0.0.1:8000/jobs/switch -d '{"model":"coder-30b-a3b"}'` tarda 60-138s, el bench lo espera.

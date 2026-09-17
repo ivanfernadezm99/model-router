@@ -1,4 +1,4 @@
-"""Health polling — 2s interval, 240s hard timeout, 180s nominal budget."""
+"""Health polling — 2s interval, 600s hard timeout para LLMs lentos (30b + contexto grande)."""
 
 import asyncio
 import logging
@@ -7,8 +7,8 @@ import httpx
 
 from src.common.validation import validate_health
 
-NOMINAL_TIMEOUT_S = 180
-HARD_TIMEOUT_S = 240
+NOMINAL_TIMEOUT_S = 300
+HARD_TIMEOUT_S = 600
 POLL_INTERVAL_S = 2.0
 
 logger = logging.getLogger(__name__)

@@ -1,4 +1,4 @@
-"""httpx streaming proxy — 240s timeout, bearer passthrough, 500/504 verbatim."""
+"""httpx streaming proxy — 600s timeout para LLMs lentos (30b + contexto grande), bearer passthrough, 500/504 verbatim."""
 
 import json
 import logging
@@ -13,7 +13,7 @@ from src.common.notify import notify_error
 
 logger = logging.getLogger(__name__)
 
-TIMEOUT_S = 240
+TIMEOUT_S = 600
 HOP_BY_HOP = {"connection", "keep-alive", "proxy-authenticate", "proxy-authorization", "te", "trailers", "transfer-encoding", "upgrade"}
 
 
