@@ -18,7 +18,7 @@ Client → :8000 /v1/* → Detector (X-Model-Hint | prefix code:/image:/video: |
 - `src/gateway/proxy.py` — `httpx.AsyncClient` streaming `text/event-stream`, bearer passthrough, 500/502/504 verbatim
 - `src/orchestrator/lifecycle.py` — `asyncio.Lock` stop-before-start, `holds_ok()` y `validate_np`
 - `src/orchestrator/health.py` / `vram.py` / `idle.py`
-- `config.yaml` — `coder-q4-131k` 14 GB, `coder-q5-65k` 18 GB, `sdxl` 6.5 GB
+- `config.yaml` — `coder-30b-a3b` 🥇 PUESTO 1 (12 GB, MoE 3B activos, 100K yarn) + `coder-14b-100k` 🥈 PUESTO 2 (14 GB, 100K yarn) + `sdxl` 6.5 GB — ranking actualizado 2026-09-18, ver `config.yaml` y `docs/MODELS.md`
 
 ## Uso
 
@@ -122,19 +122,21 @@ curl -s http://127.0.0.1:8000/jobs/image -H "Content-Type: application/json" -d 
 
 # LLM arreglado — siempre por /v1 (no por /jobs)
 curl -s http://127.0.0.1:8000/v1/chat/completions -H "Content-Type: application/json" -d '{"prompt":"hola","stream":false}' | jq
-# default code → coder-14b-100k en :8082 (si no hay X-Model-Hint ni prefix)
+# default code → coder-30b-a3b (Qwen3-30B-A3B Q4 100K) en :8082 (si no hay X-Model-Hint ni prefix) — 🥇 PUESTO 1 desde 2026-09-18
 ```
 
 **Diferencia clave**: `/v1` bloquea con `202 Retry-After` (cliente reintenta); `/jobs` devuelve `id` inmediato y el worker en `BackgroundTasks` hace `switch_to` con el mismo lock, así el cliente hace polling sin ocupar conexión.
 
 ## VRAM (RTX 3090 24 GB)
 
-| Modelo | VRAM | Puerto | Args |
-|--------|------|--------|------|
-| coder-q4-131k | 14000 MB | 8082 | `-np 1 -c 131072` |
-| coder-q5-65k | 18000 MB | 8082 | `-np 1 -c 65536` |
-| sdxl | 6500 MB | 8188 | `--listen 127.0.0.1 --port 8188` |
-| wan-14b | 20000 MB (pico 23900) | 8189 | `Wan2.1-T2V-14B, t5_cpu=True, offload, PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True` |
+| Modelo | VRAM | Puerto | Args | Ranking OPENCODE |
+|--------|------|--------|------|------------------|
+| **coder-30b-a3b** 🥇 | 12000 MB | 8082 | `Qwen3-Coder-30B-A3B Q4 — -c 100000 --rope-scaling yarn --yarn-orig-ctx 32768 -ctk q4_0 -ctv q4_0 --jinja --flash-attn` | **PUESTO 1** — Recomendado agents (tool-calling estable, 3B activos, anti-loop) |
+| **coder-14b-100k** 🥈 | 14000 MB | 8082 | `Qwen2.5-Coder-14B Q4 — -c 100000 --rope-scaling yarn --yarn-orig-ctx 32768 -ctk q4_0 -ctv q4_0 --jinja --flash-attn` | **PUESTO 2** — Ex-puesto 1 hasta 2026-09-18, frágil MCP, loops con sampler fixed via gateway |
+| coder-30b-150k | 18000 MB | 8082 | `Qwen3-30B-A3B — -c 150000 --rope-scaling yarn --no-kv-offload` | Opcional contexto largo |
+| coder-q5-65k | 18000 MB | 8082 | `-np 1 -c 65536` | Legacy |
+| sdxl | 6500 MB | 8188 | `--listen 127.0.0.1 --port 8188` | Imagen |
+| wan-14b | 20000 MB (pico 23900) | 8189 | `Wan2.1-T2V-14B, t5_cpu=True, offload, PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True` | Video |
 
 Guard fail-closed: `nvidia-smi` garbage/`N/A`/returncode!=0 → `None` → bloquea `can_start`. Idle <2 GB verificado tras cada `stop` y por `IdleReaper`.
 
@@ -217,3 +219,11 @@ grep -q "Restart=always" systemd/user/model-router-gateway.service && echo ok
 - **Holds fijos:** `cuda-driver-580` y `kornia==0.6.12` — un upgrade rompe CUDA 13 o ComfyUI en FX-8350.
 - **Logs antes de reiniciar:** `journalctl --user -u model-router-gateway.service -n 50` y `nvidia-smi`
 - **Wan 14B:** no cambies `t5_cpu` ni `expandable_segments` sin probar con `17 frames` primero. `81 frames` OOMea en 3090 sin offload.
+
+## Historial modelos OPENCODE — cambio 2026-09-18
+
+**Antes:** `coder-14b-100k` (Qwen2.5-Coder-14B Q4 100K) era 🥇 PUESTO 1. Estable 3.5/5 pero con loops de repetición (`n_tokens=65961` antes de cancel) y MCP frágil (tool-calling + disculpas).
+
+**Ahora:** `coder-30b-a3b` (Qwen3-Coder-30B-A3B Q4 100K, MoE 3B activos) es 🥇 PUESTO 1. 12 GB VRAM, `--rope-scaling yarn --jinja --flash-attn`, tool-calling nativo Qwen3. `coder-14b-100k` pasa a 🥈 PUESTO 2 con args corregidos y parche gateway `repeat_penalty=1.1 + DRY (0.8/1.75)` anti-loop inyectado en `src/gateway/proxy.py`.
+
+Ver detalle en `docs/MODELS.md`.

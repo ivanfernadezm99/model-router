@@ -1,34 +1,34 @@
 models:
+  coder-30b-a3b:
+    service: llama-code-30b-a3b.service
+    port: 8082
+    health_endpoint: /health
+    vram_mb: 12000
+    args: ["--model", "/home/servidor/Modelos/Qwen3-Coder/Qwen3-Coder-30B-A3B-Instruct-Q4_K_M.gguf", "-c", "100000", "-np", "1", "--ctx-size", "100000", "--rope-scaling", "yarn", "--yarn-orig-ctx", "32768", "-ctk", "q4_0", "-ctv", "q4_0", "-ngl", "99", "--kv-unified", "--flash-attn", "on", "--jinja", "--chat-template-file", "/home/servidor/Descargas/model-router/templates/qwen25-coder-tools.jinja", "--alias", "local-template"]
   coder-14b-100k:
     service: llama-code-q4.service
     port: 8082
     health_endpoint: /health
-    vram_mb: 20000
-    args: ["--model", "/home/servidor/Modelos/Qwen2.5-Coder-14B-Instruct-Q4_K_M.gguf", "-c", "100000", "-np", "1", "--ctx-size", "100000"]
+    vram_mb: 14000
+    args: ["--model", "/home/servidor/Modelos/Qwen2.5-Coder-14B-Instruct-Q4_K_M.gguf", "-c", "100000", "-np", "1", "--ctx-size", "100000", "--rope-scaling", "yarn", "--yarn-orig-ctx", "32768", "-ctk", "q4_0", "-ctv", "q4_0", "-ngl", "99", "--kv-unified", "--flash-attn", "on", "--jinja", "--chat-template-file", "/home/servidor/Descargas/model-router/templates/qwen25-coder-tools.jinja", "--alias", "local-template"]
   coder-14b-150k:
     service: llama-code-150k.service
     port: 8082
     health_endpoint: /health
     vram_mb: 19000
-    args: ["--model", "/home/servidor/Modelos/Qwen2.5-Coder-14B-Instruct-Q4_K_M.gguf", "-c", "150000", "-np", "1", "--ctx-size", "150000"]
+    args: ["--model", "/home/servidor/Modelos/Qwen2.5-Coder-14B-Instruct-Q4_K_M.gguf", "-c", "150000", "-np", "1", "--ctx-size", "150000", "--rope-scaling", "yarn", "--yarn-orig-ctx", "32768", "-ctk", "q4_0", "-ctv", "q4_0", "-ngl", "99", "--kv-unified", "--flash-attn", "on", "--jinja", "--chat-template-file", "/home/servidor/Descargas/model-router/templates/qwen25-coder-tools.jinja", "--alias", "local-template"]
   coder-14b-190k:
     service: llama-code-190k.service
     port: 8082
     health_endpoint: /health
     vram_mb: 22000
-    args: ["--model", "/home/servidor/Modelos/Qwen2.5-Coder-14B-Instruct-Q4_K_M.gguf", "-c", "190000", "-np", "1", "--ctx-size", "190000"]
+    args: ["--model", "/home/servidor/Modelos/Qwen2.5-Coder-14B-Instruct-Q4_K_M.gguf", "-c", "190000", "-np", "1", "--ctx-size", "190000", "--rope-scaling", "yarn", "--yarn-orig-ctx", "32768", "-ctk", "q4_0", "-ctv", "q4_0", "-ngl", "99", "--kv-unified", "--flash-attn", "on", "--jinja", "--chat-template-file", "/home/servidor/Descargas/model-router/templates/qwen25-coder-tools.jinja", "--alias", "local-template"]
   coder-14b-250k-ram:
     service: llama-code-250k-ram.service
     port: 8082
     health_endpoint: /health
     vram_mb: 12000
     args: ["--model", "/home/servidor/Modelos/Qwen2.5-Coder-14B-Instruct-Q4_K_M.gguf", "-c", "250000", "-np", "1", "--ctx-size", "250000", "--no-kv-offload"]
-  coder-30b-a3b:
-    service: llama-code-30b-a3b.service
-    port: 8082
-    health_endpoint: /health
-    vram_mb: 12000
-    args: ["--model", "/home/servidor/Modelos/Qwen3-Coder/Qwen3-Coder-30B-A3B-Instruct-Q4_K_M.gguf", "-c", "100000", "-np", "1", "--ctx-size", "100000", "--no-kv-offload"]
   coder-30b-150k:
     service: llama-code-30b-150k.service
     port: 8082
@@ -78,7 +78,8 @@ models:
     vram_mb: 6500
     args: ["--listen", "127.0.0.1", "--port", "8188"]
 defaults:
-  model: coder-14b-100k  # 🤖 OPENCODE estable — default para agents, 30b queda manual via front
+  model: coder-30b-a3b  # 🥇 PUESTO 1 OPENCODE — Qwen3-Coder-30B-A3B Q4 100K (MoE 3B activos) — recomendado para agents (explore/general), tool-calling estable, 12GB VRAM
+  # 🥈 PUESTO 2 OPENCODE — Qwen2.5-Coder-14B Q4 100K (coder-14b-100k) — ex-puesto 1 hasta 2026-09-18, estable pero tool-calling frágil, loops se corrigen con sampler DRY
   idle_timeout_seconds: 600
   swap_timeout_seconds: 240
   health_interval_seconds: 2
