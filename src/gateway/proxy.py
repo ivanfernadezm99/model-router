@@ -48,8 +48,8 @@ async def proxy_request(request: Request, target_port: int, retry_after: int | N
 
     body = await request.body()
 
-    # --- sampler anti-loop patch (Qwen2.5/Qwen3 repeat loops) — inject defaults only when missing ---
-    # Fixes: n_tokens=65961 loop at 20t/s before cancel. repeat_penalty + DRY breaks repetition.
+    # --- sampler anti-loop + determinístico (190K YaRN 5.9x) — sin margen para alucinar ---
+    # Fixes: n_tokens=65961 loop at 20t/s. 190K necesita temp baja para no alucinar con YaRN alto.
     try:
         ctype_req = request.headers.get("content-type", "")
         if "application/json" in ctype_req and "/v1/" in path and body:
@@ -58,26 +58,37 @@ async def proxy_request(request: Request, target_port: int, retry_after: int | N
                 patched = {}
                 rp = parsed.get("repeat_penalty")
                 if rp is None or rp == 1.0:
-                    parsed["repeat_penalty"] = 1.1
-                    patched["repeat_penalty"] = 1.1
+                    parsed["repeat_penalty"] = 1.15
+                    patched["repeat_penalty"] = 1.15
                 if "repeat_last_n" not in parsed:
                     parsed["repeat_last_n"] = 256
                     patched["repeat_last_n"] = 256
                 if "dry_multiplier" not in parsed or parsed.get("dry_multiplier") == 0:
-                    parsed["dry_multiplier"] = 0.8
+                    parsed["dry_multiplier"] = 0.9
                     parsed["dry_base"] = 1.75
                     parsed["dry_allowed_length"] = 2
                     parsed["dry_penalty_last_n"] = 512
-                    patched["dry_multiplier"] = 0.8
-                if "temperature" not in parsed:
-                    parsed["temperature"] = 0.7
-                    patched["temperature"] = 0.7
-                if "top_p" not in parsed:
-                    parsed["top_p"] = 0.95
-                    patched["top_p"] = 0.95
+                    patched["dry_multiplier"] = 0.9
+                # Temperatura determinística — 190K YaRN alucina con temp alta, cap a 0.2
+                t = parsed.get("temperature")
+                if t is None:
+                    parsed["temperature"] = 0.2
+                    patched["temperature"] = 0.2
+                elif t > 0.3:
+                    parsed["temperature"] = 0.2
+                    patched["temperature"] = "capped_0.2(from %.2f)" % t
+                if "top_p" not in parsed or parsed.get("top_p") > 0.9:
+                    # top_p alto + YaRN = alucinación, cap a 0.85
+                    old = parsed.get("top_p")
+                    parsed["top_p"] = 0.85
+                    patched["top_p"] = "capped_0.85(from %s)" % str(old)
                 if "top_k" not in parsed:
-                    parsed["top_k"] = 40
-                    patched["top_k"] = 40
+                    parsed["top_k"] = 20
+                    patched["top_k"] = 20
+                elif parsed.get("top_k", 0) > 40:
+                    oldk = parsed.get("top_k")
+                    parsed["top_k"] = 20
+                    patched["top_k"] = "capped_20(from %s)" % str(oldk)
                 if patched:
                     body = json.dumps(parsed).encode()
                     if "content-length" in fwd_headers:

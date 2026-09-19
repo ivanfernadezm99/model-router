@@ -78,8 +78,9 @@ models:
     vram_mb: 6500
     args: ["--listen", "127.0.0.1", "--port", "8188"]
 defaults:
-  model: coder-30b-a3b  # 🥇 PUESTO 1 OPENCODE — Qwen3-Coder-30B-A3B Q4 100K (MoE 3B activos) — recomendado para agents (explore/general), tool-calling estable, 12GB VRAM
-  # 🥈 PUESTO 2 OPENCODE — Qwen2.5-Coder-14B Q4 100K (coder-14b-100k) — ex-puesto 1 hasta 2026-09-18, estable pero tool-calling frágil, loops se corrigen con sampler DRY
+  model: coder-30b-190k  # 🥇 PUESTO 1 OPENCODE MAX-CONTEXTO — Qwen3-Coder-30B-A3B Q4 190K (22GB VRAM, YaRN 5.9x) — usa toda la VRAM, determinístico temp 0.2 + DRY para no alucinar
+  # 🥈 PUESTO 2 OPENCODE — Qwen3-Coder-30B-A3B Q4 100K (coder-30b-a3b) — 12GB VRAM, mejor calidad por YaRN bajo (3.1x), opción estable
+  # 🥉 PUESTO 3 OPENCODE — Qwen2.5-Coder-14B Q4 100K (coder-14b-100k) — ex-puesto 1 hasta 2026-09-18, relegado
   idle_timeout_seconds: 600
   swap_timeout_seconds: 240
   health_interval_seconds: 2

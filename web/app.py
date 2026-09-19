@@ -53,11 +53,11 @@ def queue():
 
 
 MODEL_DESCS = {
-    "coder-30b-a3b": "🥇 PUESTO 1 OPENCODE — Qwen3-Coder-30B-A3B MoE (Q4) 100K todo en GPU + DRY. Recomendado para agents (explore/general): tool-calling estable, 69.6% SWE-bench Verified, solo 3B activos/token → más rápido y mejor que 14B, 12GB VRAM, 100K yarn todo en GPU sin KV en RAM, sin loops. Va por gateway /v1.",
-    "coder-30b-150k": "🔥 Qwen3-Coder-30B-A3B 150K — mismo MoE 30B pero ventana extendida 150K para trabajos largos. YaRN 4.6x, ~18GB VRAM. Más contexto, leve pérdida vs 100K. Va por gateway /v1.",
-    "coder-30b-190k": "⚡ Qwen3-Coder-30B-A3B 190K — tope VRAM 30B, ~22GB, YaRN 5.9x. Para trabajos muy largos, deja 2GB libres. Calidad con algo de pérdida pero usable. Va por gateway /v1.",
+    "coder-30b-a3b": "🥈 PUESTO 2 OPENCODE — Qwen3-Coder-30B-A3B MoE (Q4) 100K todo en GPU. 12GB VRAM, mejor calidad por YaRN bajo (3.1x) → más preciso que 190K, opción estable si 190K alucina. Va por gateway /v1.",
+    "coder-30b-150k": "🔥 Qwen3-Coder-30B-A3B 150K — mismo MoE 30B pero ventana extendida 150K para trabajos largos. YaRN 4.6x, ~18GB VRAM. Intermedio entre 100K y 190K. Va por gateway /v1.",
+    "coder-30b-190k": "🥇 PUESTO 1 OPENCODE MAX-CONTEXTO — Qwen3-Coder-30B-A3B MoE (Q4) 190K todo en GPU — USA TODA LA VRAM (22GB/24GB). Determinístico temp 0.2 + DRY 0.9 + top_p 0.85 para no alucinar con YaRN 5.9x. Va por gateway /v1.",
     "coder-30b-q5-100k": "💎 Qwen3-Coder-30B-A3B Q5 100K — mismo 30B pero Q5_K_M (21GB) mejor calidad que Q4. Si no entra en VRAM, KV va a RAM. Más preciso, deja ~1GB libre. Va por gateway /v1.",
-    "coder-14b-100k": "🥈 PUESTO 2 OPENCODE — Qwen2.5-Coder-14B (Q4) 100K todo en GPU. Ex-puesto 1 hasta 2026-09-18: rápido, 14GB VRAM, tool-calling Jinja pero frágil MCP (pide disculpas) y loops corregidos con sampler DRY en gateway. Bueno pero puesto 2. Va por gateway /v1.",
+    "coder-14b-100k": "🥉 PUESTO 3 OPENCODE — Qwen2.5-Coder-14B (Q4) 100K todo en GPU. Ex-puesto 1 hasta 2026-09-18: rápido, 14GB VRAM, tool-calling Jinja pero frágil MCP (pide disculpas) y loops corregidos. Relegado. Va por gateway /v1.",
     "coder-14b-150k": "Intermedia: mismo 14B, 150K todo en GPU. Rápida, sin usar RAM. Va por gateway /v1.",
     "coder-14b-190k": "Tope GPU del 14B: 190K todo en VRAM (~21GB). Al límite, margen ~3GB. Va por gateway /v1.",
     "coder-14b-250k-ram": "250K con KV en RAM (--no-kv-offload). GPU ~11GB, KV ~14GB en RAM. Solo para contextos ultra-largos, lento por PCIe y YaRN 7.6x. Va por gateway /v1.",

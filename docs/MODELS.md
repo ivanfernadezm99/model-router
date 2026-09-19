@@ -1,12 +1,13 @@
-# Modelos — Ranking OPENCODE (actualizado 2026-09-18)
+# Modelos — Ranking OPENCODE (actualizado 2026-09-18 — 190K activo 2026-09-19)
 
 ## Resumen
 
 | Puesto | Modelo | VRAM | Contexto | Subtítulo |
 |--------|--------|------|----------|-----------|
-| 🥇 **PUESTO 1** | `coder-30b-a3b` — Qwen3-Coder-30B-A3B-Instruct Q4_K_M | 12 GB | 100K (yarn 32k→100k, q4_0 KV) | **Recomendado para agents (explore/general)** — MoE 3B activos, tool-calling estable, sin loops, gateway anti-loop |
-| 🥈 **PUESTO 2** | `coder-14b-100k` — Qwen2.5-Coder-14B-Instruct Q4_K_M | 14 GB | 100K (yarn 32k→100k, q4_0 KV) | **Bueno pero puesto 2** — Ex-puesto 1, rápido, tool-calling frágil, loops corregidos con sampler DRY en gateway |
-| — | `coder-30b-150k` | 18 GB | 150K | Opcional contexto largo Qwen3 MoE |
+| 🥇 **PUESTO 1 MAX-CONTEXTO** | `coder-30b-190k` — Qwen3-Coder-30B-A3B-Instruct Q4_K_M | 22 GB | 190K (yarn 32k→190k 5.9x, q4_0 KV) | **USA TODA LA VRAM** — 190K determinístico temp 0.2 + DRY 0.9, sin margen para alucinar |
+| 🥈 **PUESTO 2** | `coder-30b-a3b` — Qwen3-Coder-30B-A3B-Instruct Q4_K_M | 12 GB | 100K (yarn 32k→100k 3.1x) | **Calidad óptima** — YaRN bajo, más preciso que 190K, fallback estable |
+| 🥉 **PUESTO 3** | `coder-14b-100k` — Qwen2.5-Coder-14B-Instruct Q4_K_M | 14 GB | 100K (yarn 32k→100k) | **Relegado** — Ex-puesto 1 hasta 2026-09-18 |
+| — | `coder-30b-150k` | 18 GB | 150K | Intermedio Qwen3 MoE |
 | — | `coder-30b-q5-100k` | 23 GB | 100K | Qwen3 Q5 — mejor calidad, más VRAM |
 | — | `coder-q5-65k` | 18 GB | 65K | Legacy |
 
