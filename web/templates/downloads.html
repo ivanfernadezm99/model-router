@@ -34,7 +34,7 @@
     <div style="display:flex; gap:8px; flex-wrap:wrap; align-items:center;">
       <button class="btn primary" onclick="load()">🔄 Actualizar</button>
       <span id="count" class="muted small">cargando...</span>
-      <label style="margin-left:auto" class="small"><input type="checkbox" id="onlyDone" checked> solo con archivo</label>
+      <label style="margin-left:auto" class="small"><input type="checkbox" id="onlyDone"> solo con archivo</label>
     </div>
   </div>
 
@@ -73,7 +73,7 @@
           const target=(j.result&&j.result.target)||'';
           const st=j.status||'?';
           const pct=j.progress!=null?j.progress: (st==='completed'?100:st==='running'?50:0);
-          const thumb=file? (isVid(fname)?'<video class="thumb" src="'+url+'" preload="metadata" muted onclick="window.open(\''+url+'\',\'_blank\')"></video>' : '<img class="thumb" src="'+url+'" loading="lazy" onclick="window.open(\''+url+'\',\'_blank\')" />') : '<div class="thumb" style="display:flex; align-items:center; justify-content:center; color:var(--muted); font-size:11px;">sin archivo</div>';
+          const thumb=file? (isVid(fname)?'<video class="thumb" src="'+url+'" preload="metadata" muted onclick="window.open(\''+url+'\',\'_blank\')"></video>' : '<img class="thumb" src="'+url+'" loading="lazy" onclick="window.open(\''+url+'\',\'_blank\')" />') : '<div class="thumb" style="display:flex; align-items:center; justify-content:center; color:var(--err); font-size:11px; text-align:center;">⚠️ sin archivo<br><span style="font-size:10px">backend no generó</span></div>';
           const color=st==='completed'?'var(--ok)':st==='failed'?'var(--err)':'var(--accent)';
           const card=document.createElement('div');
           card.className='job-card';
