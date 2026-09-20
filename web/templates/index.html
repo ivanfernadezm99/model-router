@@ -132,9 +132,16 @@
   <script>
     var DESCS = {
       video: "Crea un video desde cero a partir de texto. Sin archivo: solo prompt. Ideal para escenas o fondos.",
-      i2v: "Anima tu foto o video: paneo / zoom cinematográfico con tu prompt. Adjuntá imagen o video como base.",
-      avatar: "Te hace hablar: adjuntá tu foto y un audio con tu voz + el texto. Genera cara/torso sincronizado.",
+      i2v: "Anima tu foto o video: paneo / zoom cinematográfico con tu prompt. ⚠️ REQUIERE imagen o video base.",
+      avatar: "Te hace hablar: adjuntá tu foto y un audio con tu voz + el texto. ⚠️ REQUIERE foto + audio.",
       image: "Crea o mejora una foto: solo prompt para crear, o adjuntá foto + qué mejorar (luz, fondo, calidad)."
+    };
+    // Requisitos por modelo — habilita/deshabilita inputs y valida antes de enviar
+    var MODEL_REQS = {
+      video:  { needImage:false, needAudio:false, needQuality:false, hint:"Solo prompt, sin archivos." },
+      i2v:    { needImage:true,  needAudio:false, needQuality:false, hint:"Requiere imagen/video base + prompt." },
+      avatar: { needImage:true,  needAudio:true,  needQuality:false, hint:"Requiere foto + audio + prompt." },
+      image:  { needImage:false, needAudio:false, needQuality:true,  hint:"Prompt solo crea, con imagen mejora." }
     };
     var modelEl = document.getElementById('model');
     var descEl = document.getElementById('modelDesc');
@@ -197,12 +204,46 @@
 
     function refreshModel() {
       var m = modelEl.value;
-      descEl.textContent = DESCS[m] || '';
-      imageWrap.style.display = (m === 'video') ? 'none' : 'block';
-      audioWrap.style.display = (m === 'avatar') ? 'block' : 'none';
-      qualityWrap.style.display = (m === 'image') ? 'block' : 'none';
+      var req = MODEL_REQS[m] || {};
+      descEl.textContent = (DESCS[m] || '') + (req.hint ? ' — ' + req.hint : '');
+      // habilita solo los inputs que necesita cada modelo
+      imageWrap.style.display = req.needImage || m === 'image' ? 'block' : 'none';
+      var imgLabel = imageWrap.querySelector('label');
+      if (imgLabel) imgLabel.textContent = req.needImage ? 'Imagen / video base — REQUERIDO *' : 'Imagen o video (opcional, para mejorar)';
+      var imgInput = document.getElementById('imageFile');
+      if (imgInput) imgInput.required = !!req.needImage;
+      audioWrap.style.display = req.needAudio ? 'block' : 'none';
+      var audLabel = audioWrap.querySelector('label');
+      if (audLabel) audLabel.textContent = req.needAudio ? 'Audio con tu voz — REQUERIDO *' : 'Audio con tu voz (solo avatar)';
+      var audInput = document.getElementById('audioFile');
+      if (audInput) audInput.required = !!req.needAudio;
+      qualityWrap.style.display = req.needQuality ? 'block' : 'none';
+      // actualiza estado del botón
+      validateForm();
+    }
+    function validateForm() {
+      var m = modelEl.value;
+      var req = MODEL_REQS[m] || {};
+      var promptOk = document.getElementById('prompt').value.trim().length > 0;
+      var imgOk = !req.needImage || document.getElementById('imageFile').files.length > 0;
+      var audOk = !req.needAudio || document.getElementById('audioFile').files.length > 0;
+      var ok = promptOk && imgOk && audOk;
+      sendBtn.disabled = !ok;
+      if (!ok) {
+        var faltan = [];
+        if (!promptOk) faltan.push('prompt');
+        if (!imgOk) faltan.push('imagen');
+        if (!audOk) faltan.push('audio');
+        sendBtn.title = 'Falta: ' + faltan.join(', ');
+      } else {
+        sendBtn.title = 'Enviar job a ' + m;
+      }
+      return ok;
     }
     modelEl.addEventListener('change', refreshModel);
+    document.getElementById('prompt').addEventListener('input', validateForm);
+    document.getElementById('imageFile').addEventListener('change', validateForm);
+    document.getElementById('audioFile').addEventListener('change', validateForm);
     refreshModel();
 
     function showJob(html) { jobStatus.style.display = 'block'; jobStatus.innerHTML = html; }
@@ -238,8 +279,12 @@
     sendBtn.addEventListener('click', async function() {
       var prompt = document.getElementById('prompt').value.trim();
       if (!prompt) { showJob('<span class="err">Escribí un prompt primero.</span>'); return; }
+      var m = modelEl.value;
+      var req = MODEL_REQS[m] || {};
+      if (req.needImage && !document.getElementById('imageFile').files[0]) { showJob('<span class="err">Falta imagen: el modelo ' + m + ' requiere una foto/video base.</span>'); return; }
+      if (req.needAudio && !document.getElementById('audioFile').files[0]) { showJob('<span class="err">Falta audio: el modelo avatar requiere audio con tu voz.</span>'); return; }
       var fd = new FormData();
-      fd.append('model', modelEl.value);
+      fd.append('model', m);
       fd.append('prompt', prompt);
       fd.append('quality', document.getElementById('quality').value);
       var img = document.getElementById('imageFile').files[0];
@@ -247,7 +292,7 @@
       var aud = document.getElementById('audioFile').files[0];
       if (aud) fd.append('audio', aud);
       sendBtn.disabled = true; sendBtn.textContent = 'Enviando...';
-      showJob('Enviando al modelo <strong>' + modelEl.value + '</strong>...');
+      showJob('Enviando al modelo <strong>' + m + '</strong>...');
       try {
         var r = await fetch('/api/submit', { method: 'POST', body: fd });
         var d = await r.json();

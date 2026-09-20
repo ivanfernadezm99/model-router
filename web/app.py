@@ -272,12 +272,14 @@ def submit():
             img = _as_data_url(request.files.get("image"))
             if img:
                 payload["image"] = img
-            elif model == "avatar" and not request.files.get("audio"):
-                pass
+            else:
+                return jsonify({"error": f"el modelo {model} requiere una imagen (adjuntá foto/video base)"}), 400
         if model == "avatar":
             aud = _as_data_url(request.files.get("audio"), default_mime="audio/wav")
             if aud:
                 payload["audio"] = aud
+            else:
+                return jsonify({"error": "el modelo avatar requiere un audio (adjuntá tu voz)"}), 400
         resp = requests.post(f"{ROUTER_BASE}/jobs/{endpoint}", json=payload, timeout=30)
         if resp.status_code in (200, 202):
             data = resp.json()
