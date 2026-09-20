@@ -1,0 +1,108 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Descargas — Todos los jobs</title>
+  <style>
+    :root { --bg:#0a0a0f; --bg-card:#12121a; --fg:#e0e0e0; --muted:#888; --accent:#00d4aa; --err:#ff5f57; --ok:#00e676; }
+    * { box-sizing:border-box; margin:0; padding:0; font-family:system-ui,sans-serif; }
+    body { background:var(--bg); color:var(--fg); min-height:100vh; padding:20px; max-width:1000px; margin:0 auto; line-height:1.5; }
+    h1 { color:var(--accent); margin-bottom:4px; }
+    .card { background:var(--bg-card); border-radius:8px; padding:15px; margin-bottom:12px; border:1px solid #2a2a3a; }
+    .muted { color:var(--muted); font-size:.85em; } .small{font-size:.85em}
+    .ok{color:var(--ok)} .err{color:var(--err)}
+    .btn{padding:6px 12px; border:1px solid #3a3a4a; border-radius:4px; cursor:pointer; font-weight:600; background:#1a1a2a; color:var(--fg); text-decoration:none; display:inline-block; font-size:13px;}
+    .btn.primary{background:var(--accent); color:#000; border-color:var(--accent);}
+    .btn.ghost{background:#1a1a2a; color:var(--fg);}
+    .row{display:flex; gap:10px; align-items:flex-start; flex-wrap:wrap;}
+    .thumb{width:120px; height:80px; object-fit:cover; border-radius:4px; border:1px solid #2a2a3a; background:#0d0d1a; cursor:zoom-in;}
+    video.thumb{width:160px; height:90px;}
+    .meta{flex:1; min-width:260px;}
+    .grid{display:grid; grid-template-columns:repeat(auto-fill,minmax(280px,1fr)); gap:12px;}
+    .job-card{ background:var(--bg-card); border:1px solid #2a2a3a; border-radius:8px; padding:12px; }
+    .progress{height:6px; background:#333; border-radius:3px; overflow:hidden; margin:6px 0;}
+    .fill{height:100%; background:var(--accent); transition:width .3s;}
+    pre{ background:#0d0d1a; padding:8px; border-radius:4px; overflow:auto; font-size:11px; white-space:pre-wrap; word-break:break-all; max-height:120px;}
+  </style>
+</head>
+<body>
+  <h1>📁 Descargas — Todos los jobs</h1>
+  <p class="muted small"><a href="/" style="color:var(--accent)">← inicio</a> · <a href="/job/a94ba42fbb194aff8df45c2f152f1fff" style="color:var(--accent)">ejemplo job</a> · disco: <code>/media/servidor/d0a196c3-2d36-4431-b15d-8ea078ad8222/model-router-output</code> · API: <code>/api/queue</code> · <code>/8000/jobs</code></p>
+
+  <div class="card">
+    <div style="display:flex; gap:8px; flex-wrap:wrap; align-items:center;">
+      <button class="btn primary" onclick="load()">🔄 Actualizar</button>
+      <span id="count" class="muted small">cargando...</span>
+      <label style="margin-left:auto" class="small"><input type="checkbox" id="onlyDone" checked> solo con archivo</label>
+    </div>
+  </div>
+
+  <div id="grid" class="grid">Cargando...</div>
+
+  <div id="rawCard" class="card" style="display:none">
+    <h3>Raw</h3>
+    <pre id="raw"></pre>
+  </div>
+
+  <script>
+    function esc(s){ return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+    function isVid(n){ return /\.(mp4|webm|mov|m4v)$/i.test(n||''); }
+    function fmtDate(s){ try{ return new Date(s).toLocaleString('es-AR'); }catch(e){ return s||''; } }
+
+    async function load(){
+      const grid=document.getElementById('grid');
+      const count=document.getElementById('count');
+      const onlyDone=document.getElementById('onlyDone').checked;
+      grid.innerHTML='Cargando...';
+      try{
+        const r=await fetch('/api/queue');
+        const d=await r.json();
+        const jobs=d.jobs||[];
+        document.getElementById('raw').textContent=JSON.stringify(d,null,2);
+        const withFile=jobs.filter(j=>{ const f=(j.result&&j.result.file)|| (j.result&&j.result.payload&&j.result.payload.file); return !!f; });
+        const list=onlyDone?withFile:jobs;
+        count.textContent=list.length+' jobs'+(onlyDone?' con archivo':' totales')+' / '+jobs.length+' en Redis — '+withFile.length+' con archivo';
+        if(!list.length){ grid.innerHTML='<p class="muted">Sin jobs'+(onlyDone?' con archivo':'' )+'.</p>'; return; }
+        grid.innerHTML='';
+        list.forEach(j=>{
+          const file=(j.result&&j.result.file)|| (j.result&&j.result.payload&&j.result.payload.file)||'';
+          const fname=file?file.split('/').pop():'';
+          const url='/api/jobs/'+encodeURIComponent(j.id)+'/result';
+          const prompt=(j.result&&j.result.payload&&j.result.payload.prompt)||j.payload&&j.payload.prompt||'';
+          const target=(j.result&&j.result.target)||'';
+          const st=j.status||'?';
+          const pct=j.progress!=null?j.progress: (st==='completed'?100:st==='running'?50:0);
+          const thumb=file? (isVid(fname)?'<video class="thumb" src="'+url+'" preload="metadata" muted onclick="window.open(\''+url+'\',\'_blank\')"></video>' : '<img class="thumb" src="'+url+'" loading="lazy" onclick="window.open(\''+url+'\',\'_blank\')" />') : '<div class="thumb" style="display:flex; align-items:center; justify-content:center; color:var(--muted); font-size:11px;">sin archivo</div>';
+          const color=st==='completed'?'var(--ok)':st==='failed'?'var(--err)':'var(--accent)';
+          const card=document.createElement('div');
+          card.className='job-card';
+          card.innerHTML=`
+            <div class="row">
+              ${thumb}
+              <div class="meta">
+                <div><strong>${esc(j.id.substring(0,8))}...</strong> <span style="color:${color}">${esc(st)} ${pct}%</span> <span class="muted small">${esc(target)}</span></div>
+                <div class="small" style="margin:4px 0"><strong>Prompt:</strong> ${esc((prompt||'').substring(0,120))}</div>
+                <div class="muted small">${fmtDate(j.created_at)} → ${fmtDate(j.updated_at)}</div>
+                <div class="progress"><div class="fill" style="width:${pct}%"></div></div>
+                ${file?'<div class="small" style="margin:4px 0"><strong>Archivo:</strong> '+esc(file)+'</div>':''}
+                <div style="display:flex; gap:6px; flex-wrap:wrap; margin-top:6px">
+                  ${file?'<a class="btn primary" href="'+url+'" download="'+esc(fname)+'">⬇️ Descargar</a><a class="btn ghost" href="'+url+'" target="_blank">🔗 Abrir</a>':''}
+                  <a class="btn ghost" href="/job/${esc(j.id)}">👁️ Detalle</a>
+                  <a class="btn ghost" href="/api/job/${esc(j.id)}" target="_blank">JSON</a>
+                </div>
+              </div>
+            </div>
+          `;
+          grid.appendChild(card);
+        });
+      }catch(e){
+        grid.innerHTML='<span class="err">Error: '+esc(e.message)+'</span>';
+      }
+    }
+    document.getElementById('onlyDone').addEventListener('change', load);
+    load();
+    setInterval(load, 5000);
+  </script>
+</body>
+</html>

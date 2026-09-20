@@ -31,6 +31,11 @@ def monitor():
     return render_template("simple.html")
 
 
+@app.route("/downloads")
+def downloads():
+    return render_template("downloads.html")
+
+
 @app.route("/api/health")
 def health():
     try:
@@ -148,6 +153,11 @@ def switch_status():
     except Exception as e:
         return jsonify({"model": None, "status": "unknown", "detail": str(e)}), 502
 
+
+@app.route("/job/<job_id>")
+def view_job(job_id):
+    """Vista frontend para un job específico — renderiza detalle + preview si hay file."""
+    return render_template("job.html", job_id=job_id)
 
 @app.route("/api/logs")
 def logs():
