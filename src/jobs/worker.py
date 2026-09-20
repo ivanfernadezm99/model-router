@@ -177,6 +177,25 @@ async def _run_job_async(job_id: str, kind: str, payload: dict, job_queue: JobQu
         # mueve archivos generados al disco grande si hace falta
         _move_file_to_output(job_id, result_payload)
 
+        # si no hay archivo y no es un job de tipo que no genera archivo, marcar como failed
+        has_file = bool(result_payload.get("file")) or any(
+            isinstance(v, str) and v and os.path.exists(v)
+            for k in ("file", "video_path", "image_path", "output", "path")
+            for v in [result_payload.get(k)]
+        )
+        # también busca en payload anidado
+        if not has_file:
+            for v in result_payload.values():
+                if isinstance(v, dict) and isinstance(v.get("file"), str) and os.path.exists(v["file"]):
+                    has_file = True
+                    break
+        if not has_file and kind in ("video", "i2v", "avatar", "image"):
+            # si el backend no devolvió file y tampoco hay backend_error, es fallo
+            err = result_payload.get("backend_error") or "backend no devolvió archivo (¿VRAM/OOM/modelo no cargado?)"
+            jobs.update_status(job_id, "failed", error=err, result=result_payload)
+            _notify_telegram(job_id, kind, "failed", result_payload, error=err)
+            return
+
         jobs.update_status(job_id, "completed", result=result_payload)
         _notify_telegram(job_id, kind, "completed", result_payload)
     except Exception as exc:
