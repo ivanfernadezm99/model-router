@@ -18,6 +18,20 @@ MODEL_ENDPOINTS = {
 
 @app.route("/favicon.ico")
 def favicon():
+    import pathlib
+    p = pathlib.Path(__file__).parent / "static" / "favicon.ico"
+    if p.exists():
+        from flask import send_file
+        return send_file(str(p), mimetype="image/x-icon", max_age=86400)
+    return ("", 204)
+
+@app.route("/favicon.svg")
+def favicon_svg():
+    import pathlib
+    p = pathlib.Path(__file__).parent / "static" / "favicon.svg"
+    if p.exists():
+        from flask import send_file
+        return send_file(str(p), mimetype="image/svg+xml", max_age=86400)
     return ("", 204)
 
 

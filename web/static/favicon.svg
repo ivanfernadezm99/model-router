@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
+  <rect width="64" height="64" rx="12" fill="#0a0a0f"/>
+  <rect x="4" y="4" width="56" height="56" rx="10" fill="none" stroke="#00d4aa" stroke-width="2.5"/>
+  <!-- MR letters -->
+  <text x="32" y="36" text-anchor="middle" font-family="system-ui, sans-serif" font-weight="800" font-size="22" fill="#00d4aa">MR</text>
+  <text x="32" y="48" text-anchor="middle" font-family="system-ui, sans-serif" font-weight="600" font-size="8" fill="#888" letter-spacing="1.5">ROUTER</text>
+  <!-- small play dot -->
+  <circle cx="52" cy="14" r="5" fill="#00d4aa"/>
+  <polygon points="50,12 50,16 54,14" fill="#0a0a0f"/>
+</svg>
