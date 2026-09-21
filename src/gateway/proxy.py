@@ -27,10 +27,31 @@ def _redact(headers: dict) -> dict:
     return out
 
 
-async def proxy_request(request: Request, target_port: int, retry_after: int | None = None) -> Response | StreamingResponse:
+async def proxy_request(request: Request, target_port: int, retry_after: int | None = None, task: str | None = None) -> Response | StreamingResponse:
     """Proxy request to http://127.0.0.1:{target_port}{path} preserving method, headers, streaming."""
     request_id = request.headers.get("x-request-id") or str(uuid.uuid4())[:8]
     start = time.monotonic()
+    # task-aware sampler: si viene de app.py usamos ese task, sino fallback a header
+    _task_hint = (task or request.headers.get("x-model-hint", "") or "").strip().lower()
+    _is_code = _task_hint in ("", "code")  # default code, pero si detector dijo code -> es code
+    # Heurística texto vs código: si el contenido no parece código, forzar modo texto para no pegar palabras
+    # Esto corrige el caso "email en español" que hoy cae en default:code y sufre DRY agresivo
+    def _looks_like_code(text: str) -> bool:
+        if not text:
+            return True  # fallback conservador: asumir código
+        lower = text.lower()
+        code_markers = ("```", "def ", "import ", "class ", "function ", "const ", "let ", "var ", "npm ", "pip ", "cargo ", "select ", "from ", "where ", "curl ", "git ", "docker ", "{\n", ";\n")
+        if any(m in lower for m in code_markers):
+            return True
+        # si tiene mucho texto natural español sin símbolos de código -> texto
+        text_markers = ("estimado", "postulación", "atentamente", "experiencia", "integración", "hola", "asunto:", "ingeniero", "criterium", "landing")
+        if any(m in lower for m in text_markers):
+            return False
+        # fallback: si es largo y sin marcadores de código, tratar como texto
+        if len(text) > 200 and text.count("\n") < 5 and " " in text:
+            # conteo simple: si predominan palabras pegadas sin estructura de código
+            return False
+        return True
 
     # build target url — only loopback allowed
     path = request.url.path
@@ -50,11 +71,31 @@ async def proxy_request(request: Request, target_port: int, retry_after: int | N
 
     # --- sampler anti-loop + determinístico (190K YaRN 5.9x) — sin margen para alucinar ---
     # Fixes: n_tokens=65961 loop at 20t/s. 190K necesita temp baja para no alucinar con YaRN alto.
+    # FIX palabras pegadas: DRY con allowed_length=2 es agresivo para texto natural (español) y se come espacios
+    # para evitar bigrama " de", " en". Solo aplicar DRY agresivo a task=code; para texto usar modo suave.
     try:
         ctype_req = request.headers.get("content-type", "")
         if "application/json" in ctype_req and "/v1/" in path and body:
             parsed = json.loads(body)
             if isinstance(parsed, dict) and ("prompt" in parsed or "messages" in parsed):
+                # re-evaluar _is_code con contenido real si el detector dijo "code" por default
+                try:
+                    _content_probe = ""
+                    if "prompt" in parsed and isinstance(parsed["prompt"], str):
+                        _content_probe = parsed["prompt"]
+                    elif "messages" in parsed and isinstance(parsed["messages"], list) and parsed["messages"]:
+                        # último mensaje user es el que más importa
+                        for m in reversed(parsed["messages"]):
+                            if isinstance(m, dict) and m.get("role") == "user" and isinstance(m.get("content"), str):
+                                _content_probe = m["content"]
+                                break
+                        if not _content_probe:
+                            _content_probe = str(parsed["messages"][-1].get("content", "")) if isinstance(parsed["messages"][-1], dict) else ""
+                    if _content_probe and not _looks_like_code(_content_probe):
+                        _is_code = False
+                        _task_hint = "text"
+                except Exception:
+                    pass
                 patched = {}
                 rp = parsed.get("repeat_penalty")
                 if rp is None or rp == 1.0:
@@ -63,20 +104,45 @@ async def proxy_request(request: Request, target_port: int, retry_after: int | N
                 if "repeat_last_n" not in parsed:
                     parsed["repeat_last_n"] = 256
                     patched["repeat_last_n"] = 256
-                if "dry_multiplier" not in parsed or parsed.get("dry_multiplier") == 0:
-                    parsed["dry_multiplier"] = 0.9
-                    parsed["dry_base"] = 1.75
-                    parsed["dry_allowed_length"] = 2
-                    parsed["dry_penalty_last_n"] = 512
-                    patched["dry_multiplier"] = 0.9
-                # Temperatura determinística — 190K YaRN alucina con temp alta, cap a 0.2
+                # DRY: solo para código; para texto deshabilitar o usar allowed_length=8 suave
+                if _is_code:
+                    if "dry_multiplier" not in parsed or parsed.get("dry_multiplier") == 0:
+                        parsed["dry_multiplier"] = 0.9
+                        parsed["dry_base"] = 1.75
+                        parsed["dry_allowed_length"] = 2
+                        parsed["dry_penalty_last_n"] = 512
+                        patched["dry_multiplier"] = 0.9
+                        patched["dry_task"] = "code"
+                else:
+                    # texto natural: desactivar DRY agresivo, usar allowed_length=8 si viene seteado
+                    if parsed.get("dry_multiplier", 0) != 0:
+                        # si el caller ya pidió DRY, suavizarlo
+                        if parsed.get("dry_allowed_length", 2) < 8:
+                            parsed["dry_allowed_length"] = 8
+                            patched["dry_allowed_length"] = "softened_to_8_for_text"
+                    else:
+                        # explícitamente deshabilitar DRY para texto
+                        parsed["dry_multiplier"] = 0
+                        patched["dry_multiplier"] = "disabled_for_text"
+                # Temperatura: code -> determinística 0.2, texto -> 0.4-0.6 más natural
                 t = parsed.get("temperature")
-                if t is None:
-                    parsed["temperature"] = 0.2
-                    patched["temperature"] = 0.2
-                elif t > 0.3:
-                    parsed["temperature"] = 0.2
-                    patched["temperature"] = "capped_0.2(from %.2f)" % t
+                if _is_code:
+                    if t is None:
+                        parsed["temperature"] = 0.2
+                        patched["temperature"] = 0.2
+                    elif t > 0.3:
+                        parsed["temperature"] = 0.2
+                        patched["temperature"] = "capped_0.2(from %.2f)" % t
+                else:
+                    if t is None:
+                        parsed["temperature"] = 0.4
+                        patched["temperature"] = 0.4
+                    elif t > 0.7:
+                        parsed["temperature"] = 0.6
+                        patched["temperature"] = "capped_0.6(from %.2f)" % t
+                    elif t < 0.2:
+                        parsed["temperature"] = 0.4
+                        patched["temperature"] = "raised_0.4(from %.2f)" % t
                 if "top_p" not in parsed or parsed.get("top_p") > 0.9:
                     # top_p alto + YaRN = alucinación, cap a 0.85
                     old = parsed.get("top_p")
@@ -93,7 +159,7 @@ async def proxy_request(request: Request, target_port: int, retry_after: int | N
                     body = json.dumps(parsed).encode()
                     if "content-length" in fwd_headers:
                         fwd_headers["content-length"] = str(len(body))
-                    logger.info(json.dumps({"request_id": request_id, "sampler_patch": True, "patched": patched, "target": target_port}))
+                    logger.info(json.dumps({"request_id": request_id, "sampler_patch": True, "patched": patched, "target": target_port, "task": _task_hint or "code"}))
     except Exception as e:
         logger.warning(json.dumps({"request_id": request_id, "sampler_patch_error": str(e)}))
 
