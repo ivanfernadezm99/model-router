@@ -28,7 +28,7 @@ async def poll_health(
     url = f"http://127.0.0.1:{port}{endpoint}"
     deadline = asyncio.get_event_loop().time() + timeout_s
 
-    async with httpx.AsyncClient(timeout=2.0) as client:
+    async with httpx.AsyncClient(timeout=5.0) as client:
         while True:
             if asyncio.get_event_loop().time() >= deadline:
                 logger.warning("health timeout url=%s timeout=%s", url, timeout_s)
@@ -36,7 +36,18 @@ async def poll_health(
             try:
                 resp = await client.get(url)
                 if resp.status_code == 200:
-                    return True
+                    # para Wan y otros que exponen loaded, esperar a loaded:true
+                    try:
+                        data = resp.json()
+                        if isinstance(data, dict) and "loaded" in data:
+                            if data.get("loaded") is True:
+                                return True
+                            # aún cargando → seguir esperando, no dar por ready
+                            logger.debug("health poll loaded=false url=%s", url)
+                        else:
+                            return True
+                    except Exception:
+                        return True
             except Exception as exc:
                 logger.debug("health poll error url=%s err=%s", url, exc)
             # check if remaining time < interval -> sleep remaining

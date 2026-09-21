@@ -126,7 +126,7 @@ async def _run_job_async(job_id: str, kind: str, payload: dict, job_queue: JobQu
                     # call wan-video :8189 /generate (draft 480x832, 33 frames, 20 steps by default for speed)
                     spec = registry.resolve(target)
                     port = int(spec["port"])
-                    async with httpx.AsyncClient(timeout=600) as client:
+                    async with httpx.AsyncClient(timeout=1200) as client:
                         gen_payload = {
                             "prompt": payload.get("prompt", ""),
                             "height": payload.get("height", 480),
@@ -141,7 +141,7 @@ async def _run_job_async(job_id: str, kind: str, payload: dict, job_queue: JobQu
                 elif kind == "i2v":
                     spec = registry.resolve(target)
                     port = int(spec["port"])
-                    async with httpx.AsyncClient(timeout=600) as client:
+                    async with httpx.AsyncClient(timeout=1200) as client:
                         gen_payload = {
                             "prompt": payload.get("prompt", ""),
                             "image": payload.get("image", ""),
@@ -156,7 +156,7 @@ async def _run_job_async(job_id: str, kind: str, payload: dict, job_queue: JobQu
                 elif kind == "avatar":
                     spec = registry.resolve(target)
                     port = int(spec["port"])
-                    async with httpx.AsyncClient(timeout=600) as client:
+                    async with httpx.AsyncClient(timeout=1200) as client:
                         gen_payload = {
                             "image": payload.get("image", ""),
                             "audio": payload.get("audio", ""),
