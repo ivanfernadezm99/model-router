@@ -64,7 +64,15 @@ class LoopGuardMiddleware(BaseHTTPMiddleware):
         return hashlib.sha256(key.encode()).hexdigest()[:16]
 
     async def dispatch(self, request: Request, call_next):
-        # Create session guard for this request (stable across agent loop)
+        # The iteration gate must NEVER apply to operational traffic: health
+        # polls, metrics, web UI and job endpoints send dozens of legit
+        # requests per minute. Counting those against an agent-iteration
+        # budget self-DOSes the gateway (front polls /health every 5s).
+        # Loop protection applies ONLY to /v1/ inference calls.
+        if not request.url.path.startswith("/v1/"):
+            return await call_next(request)
+
+        # Create session guard for this inference request (stable across agent loop)
         session_id = self._resolve_session_id(request)
         guard = get_session_guard(
             session_id=session_id,
@@ -72,57 +80,39 @@ class LoopGuardMiddleware(BaseHTTPMiddleware):
             max_total_retries=self.max_retries
         )
         current_guard.set(guard)
-        
-        # Check if we've exceeded global limits
-        if not guard.can_proceed():
-            logger.warning(json.dumps({
-                "event": "request_blocked_by_loop_guard",
-                "session_id": session_id,
-                "iteration": guard._iteration_count,
-                "reason": "iteration_limit_exceeded"
-            }))
-            return Response(
-                content=json.dumps({
-                    "error": "Request blocked: too many iterations",
-                    "session_id": session_id
-                }),
-                status_code=429,
-                media_type="application/json"
-            )
-        
+
         # Add request context entry
         guard.add_context_entry(f"request:{request.url.path}")
 
         # Identical-prompt loop detection (LLM resending same prompt after same error)
-        if request.url.path.startswith("/v1/"):
-            try:
-                raw = await request.body()
-                # Re-inject body downstream: Starlette caches request.body(), safe to re-read.
-                phash = self._prompt_hash(raw)
-                count = self._recent_prompt_hashes.get(phash, 0) + 1
-                self._recent_prompt_hashes[phash] = count
-                # Keep bounded
-                if len(self._recent_prompt_hashes) > 200:
-                    oldest = next(iter(self._recent_prompt_hashes))
-                    del self._recent_prompt_hashes[oldest]
-                if count >= 3:
-                    logger.warning(json.dumps({
-                        "event": "loop_guard_identical_prompt",
+        try:
+            raw = await request.body()
+            # Starlette caches request.body(), safe to re-read downstream.
+            phash = self._prompt_hash(raw)
+            count = self._recent_prompt_hashes.get(phash, 0) + 1
+            self._recent_prompt_hashes[phash] = count
+            # Keep bounded
+            if len(self._recent_prompt_hashes) > 200:
+                oldest = next(iter(self._recent_prompt_hashes))
+                del self._recent_prompt_hashes[oldest]
+            if count >= 3:
+                logger.warning(json.dumps({
+                    "event": "loop_guard_identical_prompt",
+                    "session_id": session_id,
+                    "prompt_hash": phash,
+                    "count": count,
+                }))
+                return Response(
+                    content=json.dumps({
+                        "error": "LOOP_DETECTED / retryable=false - STOP. Identical prompt sent 3x. Continue with available info.",
                         "session_id": session_id,
                         "prompt_hash": phash,
-                        "count": count,
-                    }))
-                    return Response(
-                        content=json.dumps({
-                            "error": "LOOP_DETECTED / retryable=false - STOP. Identical prompt sent 3x. Continue with available info.",
-                            "session_id": session_id,
-                            "prompt_hash": phash,
-                        }),
-                        status_code=429,
-                        media_type="application/json",
-                    )
-            except Exception:
-                pass
+                    }),
+                    status_code=429,
+                    media_type="application/json",
+                )
+        except Exception:
+            pass
         
         try:
             response = await call_next(request)
