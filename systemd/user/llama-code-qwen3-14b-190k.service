@@ -1,0 +1,13 @@
+[Unit]
+Description=Llama Qwen3-14B 190K 8 slots (RTX 3090)
+After=network.target
+
+[Service]
+Type=simple
+ExecStart=/home/servidor/llama.cpp/build/bin/llama-server -m /home/servidor/Modelos/Qwen3-14B-Instruct-Q4_K_M.gguf --host 127.0.0.1 --port 8082 -c 190000 --rope-scaling yarn --yarn-orig-ctx 32768 -ctk q4_0 -ctv q4_0 -ngl 99 -np 1 --kv-unified --flash-attn on --jinja --chat-template-file %h/Descargas/model-router/templates/qwen25-coder-tools.jinja --alias local-template
+Restart=always
+RestartSec=5
+Environment=PYTHONUNBUFFERED=1
+
+[Install]
+WantedBy=default.target

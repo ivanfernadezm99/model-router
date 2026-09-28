@@ -41,6 +41,7 @@ Qwen3-14B denso rinde muy bien para code/chat general con menos VRAM que los 30B
 - Gotcha: los .service del repo hay que copiarlos a ~/.config/systemd/user/ + daemon-reload; sin eso el switch queda colgado en "switching" (le pasó al primer intento, se resolvió reiniciando el gateway y reintentando)
 - Incidente: a mitad del trabajo el :8082 quedó sirviendo el Qwen2.5 viejo (posible switch manual desde el front). Se detectó por `ps` (cmdline mostraba Qwen2.5-Coder + -np 1) y se corrigió con switch del gateway. Lección: verificar identidad por /props model_path, no por tests de eco.
 - Concurrencia: -np 1 → -np 4 SOLO en config+service propios de qwen3-14b-100k. Verificado: /slots=4, /props model_path=Qwen3-14B-Instruct-Q4_K_M.gguf, 4 reqs concurrentes en 4.1s total. n_ctx por slot = pool completo 100096 (unificado, no dividido en 25K).
+- BLOQUEO ARQUITECTURA: validate_np (src/common/validation.py) rechaza -np>1 y tumba el registry entero (0 modelos, gateway degradado). Renombre a qwen3-14b-190k + np8 causó el incidente; restaurado a 190K/np1. 190K verificado: n_ctx 190208, VRAM 17.8GB/24GB. Paralelismo multi-slot requiere decisión explícita del usuario (cambiar la guarda).
 
 ## Evidencia
 - Ruta: delegated direct, writer trigger (2+ archivos no triviales + descarga)
