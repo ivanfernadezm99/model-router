@@ -42,6 +42,8 @@ Qwen3-14B denso rinde muy bien para code/chat general con menos VRAM que los 30B
 - Incidente: a mitad del trabajo el :8082 quedó sirviendo el Qwen2.5 viejo (posible switch manual desde el front). Se detectó por `ps` (cmdline mostraba Qwen2.5-Coder + -np 1) y se corrigió con switch del gateway. Lección: verificar identidad por /props model_path, no por tests de eco.
 - Concurrencia: -np 1 → -np 4 SOLO en config+service propios de qwen3-14b-100k. Verificado: /slots=4, /props model_path=Qwen3-14B-Instruct-Q4_K_M.gguf, 4 reqs concurrentes en 4.1s total. n_ctx por slot = pool completo 100096 (unificado, no dividido en 25K).
 - BLOQUEO ARQUITECTURA: validate_np (src/common/validation.py) rechaza -np>1 y tumba el registry entero (0 modelos, gateway degradado). Renombre a qwen3-14b-190k + np8 causó el incidente; restaurado a 190K/np1. 190K verificado: n_ctx 190208, VRAM 17.8GB/24GB. Paralelismo multi-slot requiere decisión explícita del usuario (cambiar la guarda).
+- Excepción B: NP_MULTI_SLOT_SERVICES en validation.py solo para llama-code-qwen3-14b-190k.service + service pasado en config.py/lifecycle.py + tests extendidos (4 passed). Journal prueba carga qwen3-190k np8: n_slots=8, n_ctx_slot=190208, sin bind errors.
+- INTERFERENCIA: el backend fue switcheado a Qwen2.5 (coder-14b-100k) 3 veces desde el front/API durante la verificación (journal 19:47:02 y 19:48:39). Los timings de "8 en 1.9s" y /props 100096 corresponden al 2.5, NO al Qwen3 — quedan invalidados. Falta re-verificación limpia del qwen3 con front quieto.
 
 ## Evidencia
 - Ruta: delegated direct, writer trigger (2+ archivos no triviales + descarga)

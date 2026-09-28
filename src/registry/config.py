@@ -23,7 +23,7 @@ def validate_config(data: dict) -> bool:
         for k in REQ:
             if k not in spec:
                 raise ValueError(f"{name} missing {k}")
-        validate_np(spec["args"])
+        validate_np(spec["args"], spec["service"])
         validate_health(spec["health_endpoint"], spec["port"])
         if not spec["service"].endswith(".service"):
             raise ValueError(f"bad service {spec['service']}")

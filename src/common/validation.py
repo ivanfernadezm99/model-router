@@ -3,8 +3,14 @@ import subprocess
 
 ALLOWED = {"127.0.0.1:8082/health", "127.0.0.1:8083/health", "127.0.0.1:8188/system_stats", "127.0.0.1:8189/health", "127.0.0.1:8191/health", "127.0.0.1:8192/health"}
 
+# Excepción chatbot multi-usuario: solo estos services pueden usar -np > 1.
+# El resto del proyecto sigue single-slot (determinismo anti-loops).
+NP_MULTI_SLOT_SERVICES = {"llama-code-qwen3-14b-190k.service"}
 
-def validate_np(args: list[str]) -> None:
+
+def validate_np(args: list[str], service: str | None = None) -> None:
+    if service in NP_MULTI_SLOT_SERVICES:
+        return
     for i, a in enumerate(args):
         if a == "-np" and i + 1 < len(args):
             if int(args[i + 1]) > 1:

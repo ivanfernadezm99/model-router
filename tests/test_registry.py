@@ -22,6 +22,10 @@ def test_np_rejected():
         validate_np(["-np", "2"])
     with pytest.raises(ValueError):
         validate_np(["-np", "5"])
+    # excepción chatbot: solo el service autorizado pasa con -np > 1
+    validate_np(["-np", "8"], "llama-code-qwen3-14b-190k.service")
+    with pytest.raises(ValueError):
+        validate_np(["-np", "8"], "llama-code-q4.service")
 
 
 def test_ssrf():

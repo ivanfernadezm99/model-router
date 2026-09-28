@@ -152,7 +152,7 @@ class Orchestrator:
         self.switching_to = target  # signal that a switch is in progress
         try:
             spec = self.registry.resolve(target)  # raises KeyError -> unknown model
-            validate_np(spec.get("args", []))
+            validate_np(spec.get("args", []), spec.get("service"))
 
             if not self._check_holds(target):
                 notify_error(f"Switch bloqueado: holds faltan", f"target={target} — cuda/kornia no disponibles")
