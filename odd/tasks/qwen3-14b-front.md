@@ -32,8 +32,13 @@ Qwen3-14B denso rinde muy bien para code/chat general con menos VRAM que los 30B
 ## Progreso
 - [x] Exploración: registry=Root config.yaml, orchestrator usa systemctl --user, front lee /jobs/models/list + MODEL_DESCS
 - [x] Alta en config (qwen3-14b-100k) + service + front desc (commit cableado)
-- [ ] Descarga GGUF (en curso, ~11MB/s desde Qwen/Qwen3-14B-GGUF oficial)
-- [ ] Verificación gateway/front (restart gateway + /jobs/models/list tras descarga)
+- [x] Descarga GGUF completa 8,4GB (Qwen/Qwen3-14B-GGUF oficial, Q4_K_M)
+- [x] Verificación: switch ok, :8082 /health 200, inferencia "QWEN3 OK" vía gateway /v1
+
+## Evidencia
+- Commit cableado: 327bba4
+- Commit verificación: este
+- Gotcha: los .service del repo hay que copiarlos a ~/.config/systemd/user/ + daemon-reload; sin eso el switch queda colgado en "switching" (le pasó al primer intento, se resolvió reiniciando el gateway y reintentando)
 
 ## Evidencia
 - Ruta: delegated direct, writer trigger (2+ archivos no triviales + descarga)
