@@ -53,6 +53,12 @@ models:
     health_endpoint: /health
     vram_mb: 18000
     args: ["--model", "/models/coder-q5.gguf", "-c", "65536", "-np", "1", "--ctx-size", "65536"]
+  vision-7b:
+    service: llama-vision-7b.service
+    port: 8083
+    health_endpoint: /health
+    vram_mb: 6000
+    args: ["--model", "/home/servidor/Modelos/Qwen2.5-VL-7B-Instruct-q4_k_m.gguf", "--mmproj", "/home/servidor/Modelos/mmproj/Qwen2.5-VL-7B-Instruct-mmproj-bf16.gguf", "--host", "127.0.0.1", "--port", "8083", "-c", "128000", "--no-mmproj-offload", "--alias", "vision-7b"]
   wan-14b:
     service: wan-video.service
     port: 8189

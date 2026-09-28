@@ -73,12 +73,13 @@
 
   <div class="card">
     <h2>1. Elegí el modelo para el job</h2>
-    <select id="model">
-      <option value="video">🎥 video — Texto → Video (Wan T2V :8189)</option>
-      <option value="i2v">🖼️ i2v — Foto → Video animado (Wan I2V :8191)</option>
-      <option value="avatar">👤 avatar — Foto + audio → vos hablando (EchoMimicV2 :8192)</option>
-      <option value="image">🖌️ image — Crear / mejorar foto (SDXL :8188)</option>
-    </select>
+<select id="model">
+       <option value="vision">🔮 vision — Describe imágenes en markdown (Qwen2.5-VL-7B :8083)</option>
+       <option value="video">🎥 video — Texto → Video (Wan T2V :8189)</option>
+       <option value="i2v">🖼️ i2v — Foto → Video animado (Wan I2V :8191)</option>
+       <option value="avatar">👤 avatar — Foto + audio → vos hablando (EchoMimicV2 :8192)</option>
+       <option value="image">🖌️ image — Crear / mejorar foto (SDXL :8188)</option>
+     </select>
     <div id="modelDesc" class="small"></div>
   </div>
 
@@ -133,19 +134,21 @@
   </div>
 
   <script>
-    var DESCS = {
-      video: "Crea un video desde cero a partir de texto. Sin archivo: solo prompt. Ideal para escenas o fondos.",
-      i2v: "Anima tu foto o video: paneo / zoom cinematográfico con tu prompt. ⚠️ REQUIERE imagen o video base.",
-      avatar: "Te hace hablar: adjuntá tu foto y un audio con tu voz + el texto. ⚠️ REQUIERE foto + audio.",
-      image: "Crea o mejora una foto: solo prompt para crear, o adjuntá foto + qué mejorar (luz, fondo, calidad)."
-    };
-    // Requisitos por modelo — habilita/deshabilita inputs y valida antes de enviar
-    var MODEL_REQS = {
-      video:  { needImage:false, needAudio:false, needQuality:false, hint:"Solo prompt, sin archivos." },
-      i2v:    { needImage:true,  needAudio:false, needQuality:false, hint:"Requiere imagen/video base + prompt." },
-      avatar: { needImage:true,  needAudio:true,  needQuality:false, hint:"Requiere foto + audio + prompt." },
-      image:  { needImage:false, needAudio:false, needQuality:true,  hint:"Prompt solo crea, con imagen mejora." }
-    };
+var DESCS = {
+       vision: "🔮 Visión — Qwen2.5-VL-7B-Instruct Q4_K_M. Describe imágenes, screenshots, diagrams en markdown. Adjuntá una imagen y pedí la descripción.",
+       video: "Crea un video desde cero a partir de texto. Sin archivo: solo prompt. Ideal para escenas o fondos.",
+       i2v: "Anima tu foto o video: paneo / zoom cinematográfico con tu prompt. ⚠️ REQUIERE imagen o video base.",
+       avatar: "Te hace hablar: adjuntá tu foto y un audio con tu voz + el texto. ⚠️ REQUIERE foto + audio.",
+       image: "Crea o mejora una foto: solo prompt para crear, o adjuntá foto + qué mejorar (luz, fondo, calidad)."
+     };
+     // Requisitos por modelo — habilita/deshabilita inputs y valida antes de enviar
+     var MODEL_REQS = {
+       vision: { needImage:true,  needAudio:false, needQuality:false, hint:"Requiere imagen + prompt de descripción." },
+       video:  { needImage:false, needAudio:false, needQuality:false, hint:"Solo prompt, sin archivos." },
+       i2v:    { needImage:true,  needAudio:false, needQuality:false, hint:"Requiere imagen/video base + prompt." },
+       avatar: { needImage:true,  needAudio:true,  needQuality:false, hint:"Requiere foto + audio + prompt." },
+       image:  { needImage:false, needAudio:false, needQuality:true,  hint:"Prompt solo crea, con imagen mejora." }
+     };
     var modelEl = document.getElementById('model');
     var descEl = document.getElementById('modelDesc');
     var imageWrap = document.getElementById('imageWrap');
@@ -368,17 +371,18 @@
     var switchStartedAt = null;
     var MODELS_CACHE = [];
 
-    function getExpectedLoadTime(name) {
-      if (name.includes('30b-a3b')) return 130;
-      if (name.includes('30b-150k')) return 140;
-      if (name.includes('30b-190k')) return 150;
-      if (name.includes('30b-q5')) return 140;
-      if (name.includes('14b-100k')) return 60;
-      if (name.includes('14b-150k')) return 70;
-      if (name.includes('14b-190k')) return 90;
-      if (name.includes('250k')) return 100;
-      return 90;
-    }
+function getExpectedLoadTime(name) {
+       if (name.includes('30b-a3b')) return 130;
+       if (name.includes('30b-150k')) return 140;
+       if (name.includes('30b-190k')) return 150;
+       if (name.includes('30b-q5')) return 140;
+       if (name.includes('14b-100k')) return 60;
+       if (name.includes('14b-150k')) return 70;
+       if (name.includes('14b-190k')) return 90;
+       if (name.includes('250k')) return 100;
+       if (name.includes('vision')) return 20;
+       return 90;
+     }
     function stopSwitchPolling() {
       if (switchTimer) { clearInterval(switchTimer); switchTimer = null; }
     }
@@ -430,33 +434,35 @@
       switchTimer = setInterval(pollSwitchStatus, 2000);
     }
     function fmtGB(mb) { return (mb / 1024).toFixed(1); }
-    function qualityScore(name, ctx) {
-      if (name.includes('30b-q5')) return 5.0;
-      if (name === 'coder-30b-a3b') return 5.0;
-      if (name.includes('30b-150k')) return 4.5;
-      if (name.includes('30b-190k')) return 4.0;
-      if (name.includes('14b-100k')) return 3.5;
-      if (name.includes('14b-150k')) return 3.0;
-      if (name.includes('14b-190k')) return 2.5;
-      if (name.includes('250k')) return 2.0;
-      if (name.includes('q5-65k')) return 2.0;
-      return 2.5;
-    }
-    function qualityTag(name, ctx) {
-      var s = qualityScore(name, ctx);
-      var base = '';
-      if (name.includes('30b-q5')) base = '💎 Q5 máx calidad';
-      else if (name === 'coder-30b-a3b' && ctx <= 100000) base = '🥈 PUESTO 2 — 100K calidad óptima';
-      else if (name.includes('30b-150k')) base = '🔥 medio — 30B 150K';
-      else if (name.includes('30b-190k')) base = '🥇 PUESTO 1 MAX-CONTEXTO — 190K usa toda VRAM';
-      else if (name === 'coder-14b-100k') base = '🥉 PUESTO 3 — ex-puesto 1, relegado';
-      else if (name.includes('14b-150k')) base = '🔶 14B medio';
-      else if (name.includes('14b-190k')) base = '⚠️ 14B pérdida';
-      else if (name.includes('250k')) base = '🐢 RAM lento';
-      else if (name.includes('q5-65k')) base = 'Q5 corto';
-      else base = '';
-      return s.toFixed(1) + '/5 ' + base;
-    }
+function qualityScore(name, ctx) {
+       if (name.includes('30b-q5')) return 5.0;
+       if (name === 'coder-30b-a3b') return 5.0;
+       if (name.includes('30b-150k')) return 4.5;
+       if (name.includes('30b-190k')) return 4.0;
+       if (name.includes('14b-100k')) return 3.5;
+       if (name.includes('14b-150k')) return 3.0;
+       if (name.includes('14b-190k')) return 2.5;
+       if (name.includes('250k')) return 2.0;
+       if (name.includes('q5-65k')) return 2.0;
+       if (name.includes('vision')) return 4.0;
+       return 2.5;
+     }
+     function qualityTag(name, ctx) {
+       var s = qualityScore(name, ctx);
+       var base = '';
+       if (name.includes('30b-q5')) base = '💎 Q5 máx calidad';
+       else if (name === 'coder-30b-a3b' && ctx <= 100000) base = '🥈 PUESTO 2 — 100K calidad óptima';
+       else if (name.includes('30b-150k')) base = '🔥 medio — 30B 150K';
+       else if (name.includes('30b-190k')) base = '🥇 PUESTO 1 MAX-CONTEXTO — 190K usa toda VRAM';
+       else if (name === 'coder-14b-100k') base = '🥉 PUESTO 3 — ex-puesto 1, relegado';
+       else if (name.includes('14b-150k')) base = '🔶 14B medio';
+       else if (name.includes('14b-190k')) base = '⚠️ 14B pérdida';
+       else if (name.includes('250k')) base = '🐢 RAM lento';
+       else if (name.includes('q5-65k')) base = 'Q5 corto';
+       else if (name.includes('vision')) base = '🔮 Visión 7B — descripción markdown';
+       else base = '';
+       return s.toFixed(1) + '/5 ' + base;
+     }
     function fmtCtxShort(ctx) {
       if (!ctx) return '?';
       return Math.round(ctx/1000) + 'K';
@@ -471,12 +477,12 @@
         var saved = null; try { saved = localStorage.getItem('activeModel'); } catch(e) {}
         var fallback = d.default_model || saved || null;
         // sort: 30B Q4 primero (100/150/190), luego Q5, luego 14B
-        MODELS_CACHE.sort(function(a,b){
-          var order = ['coder-30b-a3b','coder-30b-150k','coder-30b-190k','coder-30b-q5-100k','coder-14b-100k','coder-14b-150k','coder-14b-190k','coder-14b-250k-ram','coder-q5-65k'];
-          var ia = order.indexOf(a.name); var ib = order.indexOf(b.name);
-          if (ia === -1) ia = 99; if (ib === -1) ib = 99;
-          return ia - ib;
-        });
+MODELS_CACHE.sort(function(a,b){
+           var order = ['vision-7b','coder-30b-a3b','coder-30b-150k','coder-30b-190k','coder-30b-q5-100k','coder-14b-100k','coder-14b-150k','coder-14b-190k','coder-14b-250k-ram','coder-q5-65k'];
+           var ia = order.indexOf(a.name); var ib = order.indexOf(b.name);
+           if (ia === -1) ia = 99; if (ib === -1) ib = 99;
+           return ia - ib;
+         });
         MODELS_CACHE.forEach(function(m) {
           var o = document.createElement('option');
           o.value = m.name;

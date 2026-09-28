@@ -9,11 +9,12 @@ app = Flask(__name__)
 ROUTER_BASE = os.environ.get("ROUTER_BASE", "http://127.0.0.1:8000")
 # endpoint del router por modelo del combo
 MODEL_ENDPOINTS = {
-    "video": "video",
-    "i2v": "i2v",
-    "avatar": "avatar",
-    "image": "image",
-}
+     "vision": "vision",
+     "video": "video",
+     "i2v": "i2v",
+     "avatar": "avatar",
+     "image": "image",
+   }
 
 
 @app.route("/favicon.ico")
@@ -72,20 +73,21 @@ def queue():
 
 
 MODEL_DESCS = {
-    "coder-30b-a3b": "🥈 PUESTO 2 OPENCODE — Qwen3-Coder-30B-A3B MoE (Q4) 100K todo en GPU. 12GB VRAM, mejor calidad por YaRN bajo (3.1x) → más preciso que 190K, opción estable si 190K alucina. Va por gateway /v1.",
-    "coder-30b-150k": "🔥 Qwen3-Coder-30B-A3B 150K — mismo MoE 30B pero ventana extendida 150K para trabajos largos. YaRN 4.6x, ~18GB VRAM. Intermedio entre 100K y 190K. Va por gateway /v1.",
-    "coder-30b-190k": "🥇 PUESTO 1 OPENCODE MAX-CONTEXTO — Qwen3-Coder-30B-A3B MoE (Q4) 190K todo en GPU — USA TODA LA VRAM (22GB/24GB). Determinístico temp 0.2 + DRY 0.9 + top_p 0.85 para no alucinar con YaRN 5.9x. Va por gateway /v1.",
-    "coder-30b-q5-100k": "💎 Qwen3-Coder-30B-A3B Q5 100K — mismo 30B pero Q5_K_M (21GB) mejor calidad que Q4. Si no entra en VRAM, KV va a RAM. Más preciso, deja ~1GB libre. Va por gateway /v1.",
-    "coder-14b-100k": "🥉 PUESTO 3 OPENCODE — Qwen2.5-Coder-14B (Q4) 100K todo en GPU. Ex-puesto 1 hasta 2026-09-18: rápido, 14GB VRAM, tool-calling Jinja pero frágil MCP (pide disculpas) y loops corregidos. Relegado. Va por gateway /v1.",
-    "coder-14b-150k": "Intermedia: mismo 14B, 150K todo en GPU. Rápida, sin usar RAM. Va por gateway /v1.",
-    "coder-14b-190k": "Tope GPU del 14B: 190K todo en VRAM (~21GB). Al límite, margen ~3GB. Va por gateway /v1.",
-    "coder-14b-250k-ram": "250K con KV en RAM (--no-kv-offload). GPU ~11GB, KV ~14GB en RAM. Solo para contextos ultra-largos, lento por PCIe y YaRN 7.6x. Va por gateway /v1.",
-    "coder-q5-65k": "Código alterno Q5 65K. Menos VRAM, contexto corto. Va por gateway /v1.",
-    "wan-14b": "Texto → video desde cero. Solo prompt, sin archivo.",
-    "wan-i2v-14b": "Foto o video → video animado (paneo/zoom cinematográfico). Lleva imagen + prompt.",
-    "echomimic-v2": "Foto + audio → vos hablando (cara/torso sincronizado). Lleva imagen + audio + texto.",
-    "sdxl": "Crear o mejorar fotos. Solo prompt para crear; foto + qué mejorar para editar.",
-}
+     "vision-7b": "🔮 Visión — Qwen2.5-VL-7B-Instruct Q4_K_M (4.8GB + mmproj 1.3GB). Describe imágenes, screenshots, diagrams en markdown. :8083 CPU/RAM. 128K ctx. Adjuntá una imagen y pedí la descripción.",
+     "coder-30b-a3b": "🥈 PUESTO 2 OPENCODE — Qwen3-Coder-30B-A3B MoE (Q4) 100K todo en GPU. 12GB VRAM, mejor calidad por YaRN bajo (3.1x) → más preciso que 190K, opción estable si 190K alucina. Va por gateway /v1.",
+     "coder-30b-150k": "🔥 Qwen3-Coder-30B-A3B 150K — mismo MoE 30B pero ventana extendida 150K para trabajos largos. YaRN 4.6x, ~18GB VRAM. Intermedio entre 100K y 190K. Va por gateway /v1.",
+     "coder-30b-190k": "🥇 PUESTO 1 OPENCODE MAX-CONTEXTO — Qwen3-Coder-30B-A3B MoE (Q4) 190K todo en GPU — USA TODA LA VRAM (22GB/24GB). Determinístico temp 0.2 + DRY 0.9 + top_p 0.85 para no alucinar con YaRN 5.9x. Va por gateway /v1.",
+     "coder-30b-q5-100k": "💎 Qwen3-Coder-30B-A3B Q5 100K — mismo 30B pero Q5_K_M (21GB) mejor calidad que Q4. Si no entra en VRAM, KV va a RAM. Más preciso, deja ~1GB libre. Va por gateway /v1.",
+     "coder-14b-100k": "🥉 PUESTO 3 OPENCODE — Qwen2.5-Coder-14B (Q4) 100K todo en GPU. Ex-puesto 1 hasta 2026-09-18: rápido, 14GB VRAM, tool-calling Jinja pero frágil MCP (pide disculpas) y loops corregidos. Relegado. Va por gateway /v1.",
+     "coder-14b-150k": "Intermedia: mismo 14B, 150K todo en GPU. Rápida, sin usar RAM. Va por gateway /v1.",
+     "coder-14b-190k": "Tope GPU del 14B: 190K todo en VRAM (~21GB). Al límite, margen ~3GB. Va por gateway /v1.",
+     "coder-14b-250k-ram": "250K con KV en RAM (--no-kv-offload). GPU ~11GB, KV ~14GB en RAM. Solo para contextos ultra-largos, lento por PCIe y YaRN 7.6x. Va por gateway /v1.",
+     "coder-q5-65k": "Código alterno Q5 65K. Menos VRAM, contexto corto. Va por gateway /v1.",
+     "wan-14b": "Texto → video desde cero. Solo prompt, sin archivo.",
+     "wan-i2v-14b": "Foto o video → video animado (paneo/zoom cinematográfico). Lleva imagen + prompt.",
+     "echomimic-v2": "Foto + audio → vos hablando (cara/torso sincronizado). Lleva imagen + audio + texto.",
+     "sdxl": "Crear o mejorar fotos. Solo prompt para crear; foto + qué mejorar para editar.",
+   }
 
 
 def _ctx_from_args(args):
@@ -304,10 +306,35 @@ def submit():
                 payload["audio"] = aud
             else:
                 return jsonify({"error": "el modelo avatar requiere un audio (adjuntá tu voz)"}), 400
+
+        # Visión: va por /v1/chat/completions con formato multimodal OpenAI
+        if model == "vision":
+            img = request.files.get("image")
+            if not img:
+                return jsonify({"error": "el modelo visión requiere una imagen adjunta"}), 400
+            img_data = _as_data_url(img)
+            messages = [
+                {"role": "user", "content": [
+                    {"type": "text", "text": prompt},
+                    {"type": "image_url", "image_url": {"url": img_data}}
+                ]}
+            ]
+            resp = requests.post(
+                f"{ROUTER_BASE}/v1/chat/completions",
+                json={"messages": messages, "stream": False, "temperature": 0.3},
+                headers={"X-Model-Hint": "vision", "Content-Type": "application/json"},
+                timeout=120,
+            )
+            if resp.status_code == 200:
+                data = resp.json()
+                content = data.get("choices", [{}])[0].get("message", {}).get("content", "")
+                return jsonify({"job_id": "vision-" + data.get("id", "local"), "target": model, "status": "completed", "result": {"content": content}}), 200
+            return jsonify({"error": f"vision error: {resp.status_code} {resp.text[:200]}"}), resp.status_code
+
         resp = requests.post(f"{ROUTER_BASE}/jobs/{endpoint}", json=payload, timeout=30)
         if resp.status_code in (200, 202):
             data = resp.json()
-            return jsonify({"job_id": data.get("id"), "target": model, "status": "queued"}), 202
+            return jsonify({"id": data.get("id"), "target": model, "status": "queued"}), 202
         return jsonify({"error": resp.text[:500]}), resp.status_code
     except Exception as e:
         return jsonify({"error": str(e)}), 502

@@ -1,0 +1,15 @@
+[Unit]
+Description=Wan2.1 I2V-14B Image-to-Video :8191 (RTX 3090)
+After=network.target
+
+[Service]
+Type=simple
+WorkingDirectory=%h/Wan2.1
+Environment=WAN_MODEL_DIR=/home/servidor/Modelos/Wan2.1-I2V-14B-720P
+ExecStart=%h/Wan2.1/.venv/bin/python -m uvicorn wan_server:app --host 127.0.0.1 --port 8191
+Restart=always
+RestartSec=5
+Environment=PYTHONUNBUFFERED=1
+
+[Install]
+WantedBy=default.target

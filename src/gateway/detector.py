@@ -5,17 +5,18 @@ import logging
 
 logger = logging.getLogger(__name__)
 
-ALLOWED = {"code", "image", "video", "i2v", "avatar"}
-# task -> registry model key (code usa coder-14b-100k para opencode — estable y rápido; 30b queda para uso manual via front)
+ALLOWED = {"code", "vision", "image", "video", "i2v", "avatar"}
+# task -> registry model key
 TASK_TO_MODEL = {
     "code": "coder-14b-100k",
+    "vision": "vision-7b",
     "image": "sdxl",
     "video": "wan-14b",
     "i2v": "wan-i2v-14b",
     "avatar": "echomimic-v2",
 }
 
-PREFIXES = ("code:", "image:", "video:", "i2v:", "avatar:")
+PREFIXES = ("code:", "vision:", "image:", "video:", "i2v:", "avatar:")
 
 
 def _body_text(body: bytes | dict | str | None) -> str:

@@ -1,0 +1,141 @@
+<script>
+    // Configuración
+    const ROUTER_BASE = 'http://127.0.0.1:8000';
+    let gpuChart = null;
+    let gpuData = {
+      labels: [],
+      temp: [],
+      usage: [],
+      vram: []
+    };
+
+    // Inicializar gráfico GPU al cargar
+    function initGPUChart() {
+      const ctx = document.getElementById('gpuChart').getContext('2d');
+      gpuChart = new Chart(ctx, {
+        type: 'line',
+        data: {
+          labels: [],
+          datasets: [
+            {
+              label: 'Temp CPU (°C)',
+              borderColor: '#ffbf00',
+              backgroundColor: '#ffbf00',
+              data: [],
+              tension: 0.1
+            },
+            {
+              label: 'Uso GPU %',
+              borderColor: '#00d4aa',
+              backgroundColor: '#00d4aa',
+              data: [],
+              tension: 0.1
+            },
+            {
+              label: 'VRAM %',
+              borderColor: '#9b59b6',
+              backgroundColor: '#9b59b6',
+              data: [],
+              tension: 0.1
+            }
+          ]
+        },
+        options: {
+          responsive: true,
+          scales: {
+            y: { beginAtZero: false }
+          }
+        }
+      });
+    }
+
+    // Cargar estado de salud - SIMPLE y ROBUSTO
+    async function loadHealth() {
+      try {
+        const resp = await fetch('/api/health');
+        const data = await resp.json();
+        const statusDiv = document.getElementById('healthStatus');
+        
+        // Siempre intentamos mostrar algo, aunque model sea null
+        if (data && data.status) {
+          const vramGB = data.vram_used_mb ? (data.vram_used_mb / 1024).toFixed(1) : '?';
+          const modelName = data.model || 'ningún modelo';
+          statusDiv.innerHTML = `
+            <strong>Modelo:</strong> ${modelName}<br>
+            <strong>VRAM usada:</strong> ${vramGB} GB / 24 GB<br>
+            <strong>Estado:</strong> <span style="color: #00e676;">${data.status}</span>
+          `;
+        } else {
+          statusDiv.innerHTML = 'Sin datos del router';
+        }
+      } catch (e) {
+        document.getElementById('healthStatus').innerHTML = 'Error conectando con router';
+      }
+    }
+
+    // Cargar cola
+    async function loadQueue() {
+      try {
+        const resp = await fetch('/api/queue');
+        const data = await resp.json();
+        const queueList = document.getElementById('queueList');
+        if (data.jobs && data.jobs.length > 0) {
+          let html = '';
+          data.jobs.forEach(job => {
+            const cls = job.status === 'running' ? 'running' :
+                       job.status === 'completed' ? 'completed' :
+                       job.status === 'failed' ? 'failed' : 'pending';
+            html += `<div class="queue-item ${cls}">${job.job_id.substring(0,8)}... - ${job.target || '?'} - ${job.status || '?'}</div>`;
+          });
+          queueList.innerHTML = html;
+        } else {
+          queueList.innerHTML = data.message || 'Ningún job en cola';
+        }
+      } catch (e) {
+        document.getElementById('queueList').innerHTML = 'Error cargando cola';
+      }
+    }
+
+    // Actualizar gráfico GPU
+    function updateGPUChart(temp, usage, vram) {
+      if (!gpuChart) return;
+      const now = gpuData.labels.length;
+      gpuData.labels.push(now);
+      gpuData.temp.push(temp !== undefined ? temp : (gpuData.temp[gpuData.temp.length-1] || 45));
+      gpuData.usage.push(usage !== undefined ? usage : (gpuData.usage[gpuData.usage.length-1] || 30));
+      gpuData.vram.push(vram !== undefined ? vram : (gpuData.vram[gpuData.vram.length-1] || 50));
+      
+      gpuChart.data.labels = gpuData.labels.slice(-20);
+      gpuChart.data.datasets.forEach((ds, i) => {
+        ds.data = [gpuData.temp, gpuData.usage, gpuData.vram][i].slice(-20);
+      });
+      gpuChart.update();
+    }
+
+    // Inicializar al cargar
+    function init() {
+      initGPUChart();
+      loadHealth();   // PRIMERA CARGA INMEDIATA
+      loadQueue();
+      // Actualizar cada 3 segundos
+      setInterval(loadHealth, 3000);
+      setInterval(loadQueue, 3000);
+      setInterval(() => {
+        fetch('/api/metrics')
+          .then(r => r.text())
+          .then(text => {
+            const vramMatch = text.match /vram_used_mb\s+(\d+)/;
+            if (vramMatch) {
+              const vramGB = parseInt(vramMatch[1]) / 1024;
+              updateGPUChart(undefined, undefined, vramGB);
+            }
+          })
+          .then(() => loadHealth())  // Forzamos actualización después de métricas
+          .catch(() => {});
+          })
+      .catch(() => {});
+    }
+
+    // Auto-inicializar
+    init();
+  </script>

@@ -10,6 +10,7 @@
 | — | `coder-30b-150k` | 18 GB | 150K | Intermedio Qwen3 MoE |
 | — | `coder-30b-q5-100k` | 23 GB | 100K | Qwen3 Q5 — mejor calidad, más VRAM |
 | — | `coder-q5-65k` | 18 GB | 65K | Legacy |
+| 🔮 **VISIÓN** | `vision-7b` — Qwen2.5-VL-7B-Instruct Q4_K_M | 11.7 GB | 128K | **CPU/RAM** — descripción de imágenes en markdown |
 
 ## Detalle PUESTO 1 — Qwen3-Coder-30B-A3B Q4 100K
 
@@ -62,3 +63,16 @@ python3 -m py_compile src/gateway/proxy.py
 curl -s http://127.0.0.1:8000/v1/chat/completions -H "Content-Type: application/json" -d '{"messages":[{"role":"user","content":"hola"}],"stream":false}' | jq
 journalctl --user -u model-router-gateway.service -o cat | grep sampler_patch
 ```
+
+## Visión — Qwen2.5-VL-7B-Instruct Q4_K_M (2026-09-23)
+
+- **Modelo:** `Qwen2.5-VL-7B-Instruct-Q4_K_M.gguf` (4.82 GB) + mmproj `Qwen2.5-VL-7B-Instruct-mmproj-bf16.gguf` (1354 MB)
+- **Fuente:** `Mungert/Qwen2.5-VL-7B-Instruct-GGUF` en HuggingFace
+- **Ubicación:** `~/Modelos/Qwen2.5-VL-7B-Instruct-q4_k_m.gguf`
+- **mmproj compatible:** Nuevo `mmproj-BF16.gguf` descargado del mismo repo (el viejo era n_embd=5120 de Qwen2-VL-7B, incompatible con Qwen2.5-VL n_embd=3584)
+- **Puerto:** 8083 (servicio `llama-vision-7b.service`, systemd user)
+- **VRAM:** ~11.7 GB (cabe junto a nothing — usa CPU/RAM para pesos, VRAM para KV cache)
+- **Contexto:** 128K tokens
+- **Router:** tarea `vision` o header `X-Model-Hint: vision` → gateway :8000 → :8083
+- **Uso:** `curl -s http://127.0.0.1:8000/v1/chat/completions -H "X-Model-Hint: vision" -d '{"messages":[{"role":"user","content":"Describe esta imagen en markdown"}],"stream":false}'`
+- **Correr solo:** `systemctl --user start llama-vision-7b.service`

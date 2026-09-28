@@ -1,0 +1,51 @@
+/* style.css - Estilos simples para la web interface */
+:root {
+  --bg:#0a0a0f; --bg-card:#12121a; --fg:#e0e0e0; --muted:#666;
+  --accent:#00d4aa; --accent-hover:#00f5c4; --error:#ff5f57;
+  --success:#00e676; --warning:#ffbf00;
+}
+
+* { box-sizing: border-box; margin:0; padding:0; font-family: 'Segoe UI', system-ui, sans-serif; }
+
+body {
+  background: var(--bg); color: var(--fg); min-height: 100vh; padding: 20px; line-height: 1.5;
+}
+
+h1 { color: var(--accent); margin-bottom: 10px; }
+h2 { color: var(--fg); margin-bottom: 20px; }
+
+/* Tarjetas */
+.card { background: var(--bg-card); border-radius: 8px; padding: 15px; margin-bottom: 15px; border: 1px solid #2a2a3a; }
+
+/* Formularios */
+.form-group { margin-bottom: 15px; }
+.form-group label { display: block; margin-bottom: 5px; color: var(--muted); }
+.form-group input, .form-group select, .form-group textarea {
+  width: 100%; padding: 8px; background: #0d0d1a; border: 1px solid #3a3a4a;
+  border-radius: 4px; color: var(--fg); font-size: 14px;
+}
+.form-group textarea { min-height: 80px; resize: vertical; }
+
+/* Botones */
+.btn { padding: 10px 16px; border: none; border-radius: 4px; cursor: pointer; font-size: 14px; font-weight: 600; }
+.btn-primary { background: var(--accent); color: #000; }
+.btn-primary:hover { background: var(--accent-hover); }
+.btn-secondary { background: #1a1a2a; color: var(--fg); }
+.btn-danger { background: var(--error); color: white; }
+
+/* Estado job */
+.job-status { padding: 10px; border-radius: 4px; margin-top: 10px; display: none; }
+.job-status.running { background: #1a3a2a; color: var(--success); border: 1px solid #00e676; }
+.job-status.completed { background: #1a2a3a; color: var(--success); border: 1px solid #00c85d; }
+.job-status.failed { background: #3a1a1a; color: var(--error); border: 1px solid #ff5f57; }
+.job-status.pending { background: #2a2a3a; color: var(--muted); border: 1px solid #3a3a4a; }
+
+/* Lista cola */
+.queue-list { max-height: 200px; overflow-y: auto; font-size: 12px; }
+.queue-list div { padding: 2px 4px; margin: 1px 0; border-radius: 3px; }
+.queue-item.running { background: #1a3a2a; }
+.queue-item.completed { background: #1a2a3a; color: var(--success); }
+.queue-item.failed { background: #3a1a1a; color: var(--error); }
+
+/* Ocultos */
+.hidden { display: none !important; }

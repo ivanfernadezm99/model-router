@@ -1,0 +1,15 @@
+[Unit]
+Description=EchoMimicV2 Talking Head :8192 (RTX 3090)
+After=network.target
+
+[Service]
+Type=simple
+WorkingDirectory=%h/Modelos/EchoMimicV2
+Environment=ECHOMIMIC_MODEL_DIR=/home/servidor/Modelos/EchoMimicV2
+ExecStart=%h/Modelos/EchoMimicV2/.venv/bin/python -m uvicorn echomimic_server:app --host 127.0.0.1 --port 8192
+Restart=always
+RestartSec=5
+Environment=PYTHONUNBUFFERED=1
+
+[Install]
+WantedBy=default.target

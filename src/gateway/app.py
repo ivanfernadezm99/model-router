@@ -15,6 +15,7 @@ from src.gateway.proxy import proxy_request
 from src.gateway.queue import GatewayQueue
 from src.orchestrator.idle import IdleReaper
 from src.orchestrator.lifecycle import Orchestrator
+from src.orchestrator.loop_middleware import LoopGuardMiddleware
 from src.registry.registry import Registry
 from src.jobs.router import router as job_router
 
@@ -46,6 +47,7 @@ async def lifespan(app: FastAPI):
 
 
 app = FastAPI(lifespan=lifespan)
+app.add_middleware(LoopGuardMiddleware)
 app.include_router(job_router)
 
 

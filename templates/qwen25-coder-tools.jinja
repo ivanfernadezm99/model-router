@@ -5,6 +5,7 @@
     {%- else %}
         {{- 'You are Qwen, created by Alibaba Cloud. You are a helpful assistant.' }}
     {%- endif %}
+    {{- "\n\nTOOL ERROR POLICY:\n1. Analyze a tool error once.\n2. You may attempt ONE correction.\n3. If it fails again with the same or similar error, STOP immediately.\n4. NEVER repeat an identical tool call after 2 failures.\n5. Do not explain or apologize repeatedly. Report and continue with available info.\n6. A response marked retryable=false is final for that call.\n\nPATH RESOLUTION POLICY:\n- Verify paths with the filesystem tool. Max 2 attempts. After 2 failures, stop and report.\n" }}
     {{- "\n\n# Tools\n\nYou may call one or more functions to assist with the user query.\n\nThe available functions are provided inside <tools></tools> tags:\n<tools>" }}
     {%- for tool in tools %}
         {{- "\n" }}
