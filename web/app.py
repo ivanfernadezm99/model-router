@@ -79,7 +79,7 @@ MODEL_DESCS = {
      "coder-30b-190k": "🥇 PUESTO 1 OPENCODE MAX-CONTEXTO — Qwen3-Coder-30B-A3B MoE (Q4) 190K todo en GPU — USA TODA LA VRAM (22GB/24GB). Determinístico temp 0.2 + DRY 0.9 + top_p 0.85 para no alucinar con YaRN 5.9x. Va por gateway /v1.",
      "coder-30b-q5-100k": "💎 Qwen3-Coder-30B-A3B Q5 100K — mismo 30B pero Q5_K_M (21GB) mejor calidad que Q4. Si no entra en VRAM, KV va a RAM. Más preciso, deja ~1GB libre. Va por gateway /v1.",
       "coder-14b-100k": "🥉 PUESTO 3 OPENCODE — Qwen2.5-Coder-14B (Q4) 100K todo en GPU. Ex-puesto 1 hasta 2026-09-18: rápido, 14GB VRAM, tool-calling Jinja pero frágil MCP (pide disculpas) y loops corregidos. Relegado. Va por gateway /v1.",
-      "qwen3-14b-100k": "🆕 Qwen3-14B-Instruct (Q4) 100K todo en GPU. Denso 14B nueva generación, ~9GB pesos, 14GB VRAM. Reemplazo natural del 2.5-14B. Va por gateway /v1.",
+      "qwen3-14b-100k": "🆕 Qwen3-14B-Instruct (Q4) 100K todo en GPU. Modelo generalista denso 14B: ideal para chatbots, asistentes, redacción, razonamiento y code liviano. ~9GB pesos, 14GB VRAM. Para code pesado preferí los coder-30b. Va por gateway /v1.",
      "coder-14b-150k": "Intermedia: mismo 14B, 150K todo en GPU. Rápida, sin usar RAM. Va por gateway /v1.",
      "coder-14b-190k": "Tope GPU del 14B: 190K todo en VRAM (~21GB). Al límite, margen ~3GB. Va por gateway /v1.",
      "coder-14b-250k-ram": "250K con KV en RAM (--no-kv-offload). GPU ~11GB, KV ~14GB en RAM. Solo para contextos ultra-largos, lento por PCIe y YaRN 7.6x. Va por gateway /v1.",
