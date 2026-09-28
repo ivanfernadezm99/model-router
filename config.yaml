@@ -16,7 +16,7 @@ models:
     port: 8082
     health_endpoint: /health
     vram_mb: 14000
-    args: ["--model", "/home/servidor/Modelos/Qwen3-14B-Instruct-Q4_K_M.gguf", "-c", "100000", "-np", "1", "--ctx-size", "100000", "--rope-scaling", "yarn", "--yarn-orig-ctx", "32768", "-ctk", "q4_0", "-ctv", "q4_0", "-ngl", "99", "--kv-unified", "--flash-attn", "on", "--jinja", "--chat-template-file", "/home/servidor/Descargas/model-router/templates/qwen25-coder-tools.jinja", "--alias", "local-template"]
+    args: ["--model", "/home/servidor/Modelos/Qwen3-14B-Instruct-Q4_K_M.gguf", "-c", "100000", "-np", "4", "--ctx-size", "100000", "--rope-scaling", "yarn", "--yarn-orig-ctx", "32768", "-ctk", "q4_0", "-ctv", "q4_0", "-ngl", "99", "--kv-unified", "--flash-attn", "on", "--jinja", "--chat-template-file", "/home/servidor/Descargas/model-router/templates/qwen25-coder-tools.jinja", "--alias", "local-template"]
   coder-14b-150k:
     service: llama-code-150k.service
     port: 8082

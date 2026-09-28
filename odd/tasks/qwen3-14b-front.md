@@ -37,8 +37,10 @@ Qwen3-14B denso rinde muy bien para code/chat general con menos VRAM que los 30B
 
 ## Evidencia
 - Commit cableado: 327bba4
-- Commit verificación: este
+- Commit verificación: ddfc3da + 28e6860
 - Gotcha: los .service del repo hay que copiarlos a ~/.config/systemd/user/ + daemon-reload; sin eso el switch queda colgado en "switching" (le pasó al primer intento, se resolvió reiniciando el gateway y reintentando)
+- Incidente: a mitad del trabajo el :8082 quedó sirviendo el Qwen2.5 viejo (posible switch manual desde el front). Se detectó por `ps` (cmdline mostraba Qwen2.5-Coder + -np 1) y se corrigió con switch del gateway. Lección: verificar identidad por /props model_path, no por tests de eco.
+- Concurrencia: -np 1 → -np 4 SOLO en config+service propios de qwen3-14b-100k. Verificado: /slots=4, /props model_path=Qwen3-14B-Instruct-Q4_K_M.gguf, 4 reqs concurrentes en 4.1s total. n_ctx por slot = pool completo 100096 (unificado, no dividido en 25K).
 
 ## Evidencia
 - Ruta: delegated direct, writer trigger (2+ archivos no triviales + descarga)
