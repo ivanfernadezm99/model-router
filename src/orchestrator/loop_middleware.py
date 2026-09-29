@@ -30,13 +30,17 @@ class LoopGuardMiddleware(BaseHTTPMiddleware):
     resends the identical prompt after an identical error (MCP retry loops).
     """
 
-    def __init__(self, app, max_iterations: int = 12, max_retries: int = 15):
+    def __init__(self, app, max_iterations: int = 12, max_retries: int = 15,
+                 prompt_window_s: float = 120.0, prompt_threshold: int = 3):
         super().__init__(app)
         self.max_iterations = max_iterations
         self.max_retries = max_retries
+        self.prompt_window_s = prompt_window_s
+        self.prompt_threshold = prompt_threshold
         self._failed_paths: Set[str] = set()
         self._guard_creation_count = 0
-        self._recent_prompt_hashes: Dict[str, int] = {}
+        # key: f"{session_id}:{prompt_hash}" -> list of monotonic timestamps
+        self._recent_prompt_hashes: Dict[str, list] = {}
 
     def _resolve_session_id(self, request: Request) -> str:
         explicit = request.headers.get("x-session-id")
@@ -84,23 +88,29 @@ class LoopGuardMiddleware(BaseHTTPMiddleware):
         # Add request context entry
         guard.add_context_entry(f"request:{request.url.path}")
 
-        # Identical-prompt loop detection (LLM resending same prompt after same error)
+        # Identical-prompt loop detection, scoped per session with a time
+        # window: 3 identical prompts within prompt_window_s -> 429.
+        # Entries expire, so a block never sticks forever ("a cada rato").
         try:
             raw = await request.body()
             # Starlette caches request.body(), safe to re-read downstream.
             phash = self._prompt_hash(raw)
-            count = self._recent_prompt_hashes.get(phash, 0) + 1
-            self._recent_prompt_hashes[phash] = count
+            now = time.monotonic()
+            prompt_key = f"{session_id}:{phash}"
+            hits = [t for t in self._recent_prompt_hashes.get(prompt_key, [])
+                    if now - t < self.prompt_window_s]
+            hits.append(now)
+            self._recent_prompt_hashes[prompt_key] = hits
             # Keep bounded
             if len(self._recent_prompt_hashes) > 200:
                 oldest = next(iter(self._recent_prompt_hashes))
                 del self._recent_prompt_hashes[oldest]
-            if count >= 3:
+            if len(hits) >= self.prompt_threshold:
                 logger.warning(json.dumps({
                     "event": "loop_guard_identical_prompt",
                     "session_id": session_id,
                     "prompt_hash": phash,
-                    "count": count,
+                    "count": len(hits),
                 }))
                 return Response(
                     content=json.dumps({
