@@ -250,7 +250,7 @@ class Orchestrator:
                 # LLM services (llama.cpp) load at startup, so skip.
                 if not target.startswith("coder"):
                     try:
-                        async with httpx.AsyncClient(timeout=120) as client:
+                        async with httpx.AsyncClient(timeout=1200) as client:
                             load_resp = await client.post(f"http://127.0.0.1:{port}/load")
                             if load_resp.status_code == 200:
                                 logger.info("model loaded into VRAM target=%s", target)
