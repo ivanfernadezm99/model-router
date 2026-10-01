@@ -495,7 +495,8 @@ MODELS_CACHE.sort(function(a,b){
           var q = qualityTag(m.name, m.ctx);
           var score = qualityScore(m.name, m.ctx);
           var stars = '★'.repeat(Math.round(score)) + '☆'.repeat(5 - Math.round(score));
-          o.textContent = (m.active ? '● ' : '○ ') + m.name + ' — ' + fmtCtxShort(m.ctx) + ' ctx — ' + fmtGB(m.vram_mb || 0) + 'GB — ' + q + ' ' + stars + (m.active ? ' [ACTIVO]' : '') + (m.name === d.default_model ? ' ★ default' : '');
+          var isNew = (m.name === 'qwen3-27b-flagship' || m.name === 'qwen3-27b-xl' || m.name === 'coder-30b-128k');
+          o.textContent = (m.active ? '● ' : '○ ') + (isNew ? '🆕 NUEVO — ' : '') + m.name + ' — ' + fmtCtxShort(m.ctx) + ' ctx — ' + fmtGB(m.vram_mb || 0) + 'GB — ' + q + ' ' + stars + (m.active ? ' [ACTIVO]' : '') + (m.name === d.default_model ? ' ★ default' : '');
           if (m.active) o.selected = true;
           else if (!hasActive && fallback && m.name === fallback) o.selected = true;
           else if (!hasActive && !fallback && MODELS_CACHE[0] && m.name === MODELS_CACHE[0].name) o.selected = true;
