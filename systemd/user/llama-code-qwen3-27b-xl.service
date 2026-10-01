@@ -1,0 +1,13 @@
+[Unit]
+Description=Llama Qwen3.8-27B XL 160K (RTX 3090)
+After=network.target
+
+[Service]
+Type=simple
+ExecStart=/home/servidor/llama.cpp/build/bin/llama-server -m /home/servidor/Modelos/Qwen3.8-27B-UD-Q4_K_XL.gguf -ngl 99 -c 160000 -np 1 -fa on -ctk q4_0 -ctv q4_0 -b 2048 -ub 512 --jinja --host 127.0.0.1 --port 8082 --alias local-template
+Restart=always
+RestartSec=5
+Environment=PYTHONUNBUFFERED=1
+
+[Install]
+WantedBy=default.target

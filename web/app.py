@@ -74,6 +74,7 @@ def queue():
 
 MODEL_DESCS = {
      "qwen3-27b-flagship": "🆕 NUEVO MODELO INSIGNIA — Qwen3.8-27B-UD-Q4_K_S.gguf | DENSO 27B Q4_K_S | 160K + reasoning. Mejor razonamiento general que los MoE 30B y que el 14B. ~15GB pesos, ~18GB VRAM. Candidato a nuevo default. Va por gateway /v1.",
+     "qwen3-27b-xl": "🆕 Qwen3.8-27B-UD-Q4_K_XL.gguf | DENSO 27B Q4_K_XL | 160K sin reasoning explícito. Hermano del flagship con quant XL (~17GB): un poco más de calidad, un poco más de VRAM (~20GB). Para comparar contra el Q4_K_S. Va por gateway /v1.",
      "vision-7b": "🔮 Visión — Qwen2.5-VL-7B-Instruct-q4_k_m.gguf | DENSO 7B + mmproj (1.3GB). Describe imágenes, screenshots, diagrams en markdown. :8083 CPU/RAM. 128K ctx. Adjuntá una imagen y pedí la descripción.",
      "coder-30b-a3b": "🥈 PUESTO 2 OPENCODE — Qwen3-Coder-30B-A3B-Instruct-Q4_K_M.gguf | MoE 30B (3B activos) Q4 | 100K todo en GPU. 12GB VRAM, YaRN bajo (3.1x) → más preciso que 190K, opción estable si 190K alucina. Va por gateway /v1.",
      "coder-30b-150k": "🔥 Qwen3-Coder-30B-A3B-Instruct-Q4_K_M.gguf | MoE 30B Q4 | 150K. Ventana extendida para trabajos largos. YaRN 4.6x, ~18GB VRAM. Intermedio entre 100K y 190K. Va por gateway /v1.",
