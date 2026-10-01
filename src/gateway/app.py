@@ -218,6 +218,22 @@ async def v1_proxy(path: str, request: Request):
 
     # mismatch -> need swap (stop-before-start). Hold queue swapping flag.
     # If active is None (idle), just start.
+    # AUTO_SWITCH_DISABLED=1: no tumbar el modelo activo; proxear a lo que esté cargado o 409.
+    if _os.environ.get("AUTO_SWITCH_DISABLED", "0") == "1":
+        if orchestrator.active_model:
+            try:
+                from src.orchestrator.health import poll_health as _ph
+                _spec = registry.resolve(orchestrator.active_model)
+                if await _ph(int(_spec["port"]), _spec["health_endpoint"], timeout_s=3):
+                    resp = await proxy_request(request, int(_spec["port"]), task=task)
+                    latency_ms = int((time.monotonic() - start) * 1000)
+                    logger.info(json.dumps({"request_id": request_id, "hint": task, "target_model": target_model, "active_model": orchestrator.active_model, "queue_depth": queue.depth(), "latency_ms": latency_ms, "status": resp.status_code, "auto_switch": "disabled-passthrough"}))
+                    return resp
+            except Exception:
+                pass
+        latency_ms = int((time.monotonic() - start) * 1000)
+        logger.warning(json.dumps({"request_id": request_id, "hint": task, "target_model": target_model, "queue_depth": queue.depth(), "latency_ms": latency_ms, "error": "auto-switch disabled, no active model"}))
+        return JSONResponse({"error": "auto-switch disabled: cargá un modelo manualmente desde el front", "target": target_model}, status_code=409)
     queue.set_swapping(target_model)
     try:
         ok = await orchestrator.switch_to(target_model)
