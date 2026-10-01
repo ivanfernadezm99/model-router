@@ -47,7 +47,12 @@ async def lifespan(app: FastAPI):
 
 
 app = FastAPI(lifespan=lifespan)
-app.add_middleware(LoopGuardMiddleware)
+# LOOP_GUARD_DISABLED=1 apaga temporalmente la gestión anti-loops (volver a habilitar borrando la var)
+import os as _os
+if _os.environ.get("LOOP_GUARD_DISABLED", "0") != "1":
+    app.add_middleware(LoopGuardMiddleware)
+else:
+    logger.warning("LoopGuardMiddleware DESHABILITADO por LOOP_GUARD_DISABLED=1")
 app.include_router(job_router)
 
 
