@@ -1,4 +1,10 @@
 models:
+  qwen3-27b-flagship:
+    service: llama-code-qwen3-27b.service
+    port: 8082
+    health_endpoint: /health
+    vram_mb: 23000
+    args: ["--model", "/home/servidor/Modelos/Qwen3.8-27B-UD-Q4_K_S.gguf", "-ngl", "99", "-c", "160000", "-np", "1", "-fa", "on", "-ctk", "q4_0", "-ctv", "q4_0", "-b", "2048", "-ub", "512", "--jinja", "--reasoning", "on", "--host", "127.0.0.1", "--port", "8082", "--alias", "local-template"]
   coder-30b-a3b:
     service: llama-code-30b-a3b.service
     port: 8082
