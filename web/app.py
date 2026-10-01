@@ -73,22 +73,22 @@ def queue():
 
 
 MODEL_DESCS = {
-     "qwen3-27b-flagship": "🆕 NUEVO MODELO INSIGNIA — Qwen3.8-27B-UD-Q4_K_S.gguf (Qwen3 27B denso, quant Q4_K_S) 160K con reasoning. Mejor razonamiento y calidad general que los MoE 30B y que el 14B. ~15GB pesos, ~18GB VRAM. El candidato a nuevo default. Va por gateway /v1.",
-     "vision-7b": "🔮 Visión — Qwen2.5-VL-7B-Instruct Q4_K_M (4.8GB + mmproj 1.3GB). Describe imágenes, screenshots, diagrams en markdown. :8083 CPU/RAM. 128K ctx. Adjuntá una imagen y pedí la descripción.",
-     "coder-30b-a3b": "🥈 PUESTO 2 OPENCODE — Qwen3-Coder-30B-A3B MoE (Q4) 100K todo en GPU. 12GB VRAM, mejor calidad por YaRN bajo (3.1x) → más preciso que 190K, opción estable si 190K alucina. Va por gateway /v1.",
-     "coder-30b-150k": "🔥 Qwen3-Coder-30B-A3B 150K — mismo MoE 30B pero ventana extendida 150K para trabajos largos. YaRN 4.6x, ~18GB VRAM. Intermedio entre 100K y 190K. Va por gateway /v1.",
-     "coder-30b-190k": "🥇 PUESTO 1 OPENCODE MAX-CONTEXTO — Qwen3-Coder-30B-A3B MoE (Q4) 190K todo en GPU — USA TODA LA VRAM (22GB/24GB). Determinístico temp 0.2 + DRY 0.9 + top_p 0.85 para no alucinar con YaRN 5.9x. Va por gateway /v1.",
-     "coder-30b-q5-100k": "💎 Qwen3-Coder-30B-A3B Q5 100K — mismo 30B pero Q5_K_M (21GB) mejor calidad que Q4. Si no entra en VRAM, KV va a RAM. Más preciso, deja ~1GB libre. Va por gateway /v1.",
-      "coder-14b-100k": "🥉 PUESTO 3 OPENCODE — Qwen2.5-Coder-14B (Q4) 100K todo en GPU. Ex-puesto 1 hasta 2026-09-18: rápido, 14GB VRAM, tool-calling Jinja pero frágil MCP (pide disculpas) y loops corregidos. Relegado. Va por gateway /v1.",
-      "qwen3-14b-190k": "🆕 Qwen3-14B-Instruct (Q4) 190K, 8 chats simultáneos. Modelo generalista: ideal para chatbots, asistentes, redacción, razonamiento y code liviano. ~9GB pesos, ~19GB VRAM. Para code pesado preferí los coder-30b. Va por gateway /v1.",
-     "coder-14b-150k": "Intermedia: mismo 14B, 150K todo en GPU. Rápida, sin usar RAM. Va por gateway /v1.",
-     "coder-14b-190k": "Tope GPU del 14B: 190K todo en VRAM (~21GB). Al límite, margen ~3GB. Va por gateway /v1.",
-     "coder-14b-250k-ram": "250K con KV en RAM (--no-kv-offload). GPU ~11GB, KV ~14GB en RAM. Solo para contextos ultra-largos, lento por PCIe y YaRN 7.6x. Va por gateway /v1.",
+     "qwen3-27b-flagship": "🆕 NUEVO MODELO INSIGNIA — Qwen3.8-27B-UD-Q4_K_S.gguf | DENSO 27B Q4_K_S | 160K + reasoning. Mejor razonamiento general que los MoE 30B y que el 14B. ~15GB pesos, ~18GB VRAM. Candidato a nuevo default. Va por gateway /v1.",
+     "vision-7b": "🔮 Visión — Qwen2.5-VL-7B-Instruct-q4_k_m.gguf | DENSO 7B + mmproj (1.3GB). Describe imágenes, screenshots, diagrams en markdown. :8083 CPU/RAM. 128K ctx. Adjuntá una imagen y pedí la descripción.",
+     "coder-30b-a3b": "🥈 PUESTO 2 OPENCODE — Qwen3-Coder-30B-A3B-Instruct-Q4_K_M.gguf | MoE 30B (3B activos) Q4 | 100K todo en GPU. 12GB VRAM, YaRN bajo (3.1x) → más preciso que 190K, opción estable si 190K alucina. Va por gateway /v1.",
+     "coder-30b-150k": "🔥 Qwen3-Coder-30B-A3B-Instruct-Q4_K_M.gguf | MoE 30B Q4 | 150K. Ventana extendida para trabajos largos. YaRN 4.6x, ~18GB VRAM. Intermedio entre 100K y 190K. Va por gateway /v1.",
+     "coder-30b-190k": "🥇 PUESTO 1 OPENCODE MAX-CONTEXTO — Qwen3-Coder-30B-A3B-Instruct-Q4_K_M.gguf | MoE 30B Q4 | 190K todo en GPU — USA TODA LA VRAM (22GB/24GB). Determinístico temp 0.2 + DRY 0.9 + top_p 0.85 para no alucinar con YaRN 5.9x. Va por gateway /v1.",
+     "coder-30b-q5-100k": "💎 Qwen3-Coder-30B-A3B-Instruct-Q5_K_M.gguf | MoE 30B Q5 | 100K. Mejor calidad que Q4 (21GB); si no entra, KV a RAM. Deja ~1GB libre. Va por gateway /v1.",
+      "coder-14b-100k": "🥉 PUESTO 3 OPENCODE — Qwen2.5-Coder-14B-Instruct-Q4_K_M.gguf | DENSO 14B Q4 | 100K todo en GPU. Ex-puesto 1 hasta 2026-09-18: rápido, 14GB VRAM, tool-calling Jinja pero frágil MCP (pide disculpas) y loops corregidos. Relegado. Va por gateway /v1.",
+      "qwen3-14b-190k": "🆕 Qwen3-14B-Instruct-Q4_K_M.gguf | DENSO 14B Q4 | 190K, 8 chats simultáneos. Generalista: chatbots, asistentes, redacción, razonamiento y code liviano. ~9GB pesos, ~19GB VRAM. Para code pesado preferí los coder-30b MoE. Va por gateway /v1.",
+     "coder-14b-150k": "Qwen2.5-Coder-14B-Instruct-Q4_K_M.gguf | DENSO 14B Q4 | 150K todo en GPU. Rápida, sin usar RAM. Va por gateway /v1.",
+     "coder-14b-190k": "Qwen2.5-Coder-14B-Instruct-Q4_K_M.gguf | DENSO 14B Q4 | 190K todo en VRAM (~21GB). Al límite, margen ~3GB. Va por gateway /v1.",
+     "coder-14b-250k-ram": "Qwen2.5-Coder-14B-Instruct-Q4_K_M.gguf | DENSO 14B Q4 | 250K con KV en RAM (--no-kv-offload). GPU ~11GB, KV ~14GB en RAM. Solo contextos ultra-largos, lento por PCIe y YaRN 7.6x. Va por gateway /v1.",
      "coder-q5-65k": "Código alterno Q5 65K. Menos VRAM, contexto corto. Va por gateway /v1.",
-     "wan-14b": "Texto → video desde cero. Solo prompt, sin archivo.",
-     "wan-i2v-14b": "Foto o video → video animado (paneo/zoom cinematográfico). Lleva imagen + prompt.",
-     "echomimic-v2": "Foto + audio → vos hablando (cara/torso sincronizado). Lleva imagen + audio + texto.",
-     "sdxl": "Crear o mejorar fotos. Solo prompt para crear; foto + qué mejorar para editar.",
+     "wan-14b": "Wan2.1-T2V-14B | difusión 14B | Texto → video desde cero. Solo prompt, sin archivo.",
+     "wan-i2v-14b": "Wan2.1-I2V-14B-720P | difusión 14B | Foto o video → video animado (paneo/zoom cinematográfico). Lleva imagen + prompt.",
+     "echomimic-v2": "EchoMimicV2 | difusión | Foto + audio → vos hablando (cara/torso sincronizado). Lleva imagen + audio + texto.",
+     "sdxl": "SDXL | difusión | Crear o mejorar fotos. Solo prompt para crear; foto + qué mejorar para editar.",
    }
 
 
