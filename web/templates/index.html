@@ -438,7 +438,8 @@ function qualityScore(name, ctx) {
         if (name.includes('27b-flagship')) return 4.8;
         if (name.includes('27b-xl')) return 4.6;
         if (name.includes('30b-q5')) return 5.0;
-       if (name === 'coder-30b-a3b') return 5.0;
+        if (name === 'coder-30b-128k') return 4.7;
+        if (name === 'coder-30b-a3b') return 5.0;
        if (name.includes('30b-150k')) return 4.5;
        if (name.includes('30b-190k')) return 4.0;
        if (name.includes('14b-100k')) return 3.5;
@@ -455,6 +456,7 @@ function qualityScore(name, ctx) {
         if (name.includes('27b-xl')) base = '🆕 Qwen3.8-27B-UD-Q4_K_XL.gguf | DENSO 27B Q4_K_XL 160K';
         else if (name.includes('27b-flagship')) base = '🆕 Qwen3.8-27B-UD-Q4_K_S.gguf | DENSO 27B Q4_K_S 160K+reasoning';
         else if (name.includes('30b-q5')) base = '💎 Qwen3-Coder-30B-A3B-Q5_K_M.gguf | MoE 30B Q5 máx calidad';
+        else if (name === 'coder-30b-128k') base = '🔷 Qwen3-Coder-30B-A3B-Q4_K_M.gguf | MoE 30B 128K punto medio';
         else if (name === 'coder-30b-a3b' && ctx <= 100000) base = '🥈 Qwen3-Coder-30B-A3B-Q4_K_M.gguf | MoE 30B 100K calidad óptima';
         else if (name.includes('30b-150k')) base = '🔥 Qwen3-Coder-30B-A3B-Q4_K_M.gguf | MoE 30B 150K';
         else if (name.includes('30b-190k')) base = '🥇 Qwen3-Coder-30B-A3B-Q4_K_M.gguf | MoE 30B 190K usa toda VRAM';
@@ -482,7 +484,7 @@ function qualityScore(name, ctx) {
         var fallback = d.default_model || saved || null;
         // sort: 30B Q4 primero (100/150/190), luego Q5, luego 14B
 MODELS_CACHE.sort(function(a,b){
-            var order = ['qwen3-27b-flagship','qwen3-27b-xl','vision-7b','coder-30b-a3b','coder-30b-150k','coder-30b-190k','coder-30b-q5-100k','coder-14b-100k','coder-14b-150k','coder-14b-190k','coder-14b-250k-ram','coder-q5-65k'];
+            var order = ['qwen3-27b-flagship','qwen3-27b-xl','vision-7b','coder-30b-a3b','coder-30b-128k','coder-30b-150k','coder-30b-190k','coder-30b-q5-100k','coder-14b-100k','coder-14b-150k','coder-14b-190k','coder-14b-250k-ram','coder-q5-65k'];
            var ia = order.indexOf(a.name); var ib = order.indexOf(b.name);
            if (ia === -1) ia = 99; if (ib === -1) ib = 99;
            return ia - ib;
