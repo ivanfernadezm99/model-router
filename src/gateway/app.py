@@ -226,6 +226,16 @@ async def v1_proxy(path: str, request: Request):
     # If active is None (idle), just start.
     # AUTO_SWITCH_DISABLED=1: no tumbar el modelo activo; proxear a lo que esté cargado o 409.
     if _os.environ.get("AUTO_SWITCH_DISABLED", "0") == "1":
+        # Manual selection policy: we never swap on our own. But refusing to
+        # swap is not the same as serving the request with whatever is loaded —
+        # an image request proxied to a code model comes back HTTP 200 with a
+        # chat completion, which reads as success. Refuse loudly instead.
+        # `code` is exempt: any active coder* model already serves it, which is
+        # the passthrough just above.
+        if task != "code" and orchestrator.active_model and orchestrator.active_model != target_model:
+            latency_ms = int((time.monotonic() - start) * 1000)
+            logger.warning(json.dumps({"request_id": request_id, "hint": task, "target_model": target_model, "active_model": orchestrator.active_model, "queue_depth": queue.depth(), "latency_ms": latency_ms, "error": "auto-switch disabled, active model cannot serve task", "auto_switch": "disabled-mismatch"}))
+            return JSONResponse({"error": f"auto-switch disabled: la tarea '{task}' necesita '{target_model}' y hay '{orchestrator.active_model}' cargado. Cargá '{target_model}' manualmente desde el front.", "task": task, "required_model": target_model, "active_model": orchestrator.active_model}, status_code=409)
         if orchestrator.active_model:
             try:
                 from src.orchestrator.health import poll_health as _ph

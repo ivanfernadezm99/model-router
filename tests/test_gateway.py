@@ -234,3 +234,39 @@ def test_v1_queued_when_swapping_returns_202():
                 except Exception:
                     break
     asyncio.run(_run())
+
+
+def test_auto_switch_disabled_refuses_mismatched_task_with_409(monkeypatch):
+    # AUTO_SWITCH_DISABLED must refuse loudly. Proxying an image request to a
+    # loaded code model returns HTTP 200 with a chat completion, which reads as
+    # a successful image generation.
+    from src.gateway import app as app_mod
+    monkeypatch.setenv("AUTO_SWITCH_DISABLED", "1")
+    previous = app_mod.orchestrator.active_model
+    app_mod.orchestrator.active_model = "coder-30b-190k"
+    try:
+        c = TestClient(app_mod.app)
+        r = c.post("/v1/chat/completions", json={"messages": [{"role": "user", "content": "un gato"}]}, headers={"X-Model-Hint": "image"})
+    finally:
+        app_mod.orchestrator.active_model = previous
+    assert r.status_code == 409
+    body = r.json()
+    assert body["required_model"] == "sdxl"
+    assert body["active_model"] == "coder-30b-190k"
+
+
+def test_auto_switch_disabled_still_passes_code_through(monkeypatch):
+    # The mismatch guard must stay exempt for `code`: the active 30b model is
+    # not TASK_TO_MODEL["code"], but it serves code requests correctly.
+    from fastapi.responses import JSONResponse
+    from src.gateway import app as app_mod
+    monkeypatch.setenv("AUTO_SWITCH_DISABLED", "1")
+    previous = app_mod.orchestrator.active_model
+    app_mod.orchestrator.active_model = "coder-30b-190k"
+    try:
+        with patch("src.gateway.app.proxy_request", new=AsyncMock(return_value=JSONResponse({"ok": True}, status_code=200))):
+            c = TestClient(app_mod.app)
+            r = c.post("/v1/chat/completions", json={"messages": [{"role": "user", "content": "hola"}]})
+    finally:
+        app_mod.orchestrator.active_model = previous
+    assert r.status_code == 200

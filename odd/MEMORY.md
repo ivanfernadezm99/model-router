@@ -114,3 +114,25 @@ los caps y las lineas `Error executing`.
 - No tocar ni commitear `.atl/`, `.playwright-mcp/`, `logs/`.
 - Artefactos tecnicos en ingles; comunicacion con el usuario en espanol.
 - Nunca agregar trailer `Co-Authored-By` a los commits.
+
+## AUTO_SWITCH_DISABLED ya estaba activo — el bug de TASK_TO_MODEL era teorico
+
+- `AUTO_SWITCH_DISABLED=1` esta en la unidad del repo, en la instalada y en el
+  proceso corriendo. El `/v1` **nunca** cambia de modelo.
+  Verificar con: `tr '\0' '\n' < /proc/$(systemctl --user show -p MainPID
+  --value model-router-gateway.service)/environ | grep AUTO_SWITCH`.
+- `TASK_TO_MODEL["code"]` ya era inofensivo: sobrevive solo como etiqueta en
+  logs y en el campo `target` del 409. No lo borres — `app.py` lo usa en el
+  fallback image/video y en `_resolve_port("code")`.
+- El agujero real era otro: con un modelo cargado que NO corresponde a la tarea
+  pedida, el request se proxyeaba al modelo equivocado y devolvia **HTTP 200 con
+  una respuesta de chat** (pedir imagen daba `"¡"` del modelo de codigo).
+  Corregido en `src/gateway/app.py`: 409 explicito con `required_model` y
+  `active_model`. Exento para `code`, que ya tiene passthrough a cualquier
+  `coder*`.
+- **Pendiente**: `/jobs/*` NO pasa por el gate — `src/jobs/worker.py:115` y
+  `src/jobs/router.py:200` llaman `orchestrator.switch_to()` directo. Con
+  "nada cambia automaticamente" eso sigue cambiando de modelo.
+- Al reiniciar el gateway, `active_model` queda `None` hasta un adopt exitoso.
+  Mientras el 30B carga (503 durante ~100s) TODO request da 409 "cargá un modelo
+  manualmente". Es preexistente, no del guard; esperar a que `/props` responda.
