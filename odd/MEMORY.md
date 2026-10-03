@@ -98,6 +98,13 @@ los caps y las lineas `Error executing`.
 - `/health` reporta `coder-14b-100k` aunque la unidad activa sea
   `llama-code-30b-190k.service` (varios modelos comparten 127.0.0.1:8082).
 - `rustdesk.service` falla en la maquina. No relacionado.
+- La unidad del modelo responde 503 durante ~30s tras un restart porque carga
+  un modelo 30B. Para decidir "esta listo?", usar `GET /props` y no `/health`:
+  /health da 503 mientras carga, despues da 200 pero todavia sin
+  `chat_template_caps` hasta que el probe del template termina.
+- **EN vs ES**: el historial de este repo paso a usar ingles en commits y
+  comentarios de codigo. Commits y codigo en ingles; la respuesta al usuario en
+  espanol.
 
 ## Entorno
 
