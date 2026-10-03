@@ -1,43 +1,124 @@
-{%- if tools %}
-    {{- '<|im_start|>system\n' }}
-    {%- if messages[0]['role'] == 'system' %}
-        {{- messages[0]['content'] }}
-    {%- else %}
-        {{- 'You are Qwen, created by Alibaba Cloud. You are a helpful assistant.' }}
-    {%- endif %}
-    {{- "\n\nTOOL ERROR POLICY:\n1. Analyze a tool error once.\n2. You may attempt ONE correction.\n3. If it fails again with the same or similar error, STOP immediately.\n4. NEVER repeat an identical tool call after 2 failures.\n5. Do not explain or apologize repeatedly. Report and continue with available info.\n6. A response marked retryable=false is final for that call.\n\nPATH RESOLUTION POLICY:\n- Verify paths with the filesystem tool. Max 2 attempts. After 2 failures, stop and report.\n" }}
-    {{- "\n\n# Tools\n\nYou may call one or more functions to assist with the user query.\n\nThe available functions are provided inside <tools></tools> tags:\n<tools>" }}
-    {%- for tool in tools %}
-        {{- "\n" }}
-        {{- tool | tojson }}
-    {%- endfor %}
-    {{- "\n</tools>\n\nIf you call a function, reply ONLY in this exact format:\n<tools>\n{\"name\": <function-name>, \"arguments\": <args-json-object>}\n</tools><|im_end|>\n" }}
-{%- else %}
-    {%- if messages[0]['role'] == 'system' %}
-        {{- '<|im_start|>system\n' + messages[0]['content'] + '<|im_end|>\n' }}
-    {%- else %}
-        {{- '<|im_start|>system\nYou are Qwen, created by Alibaba Cloud. You are a helpful assistant.<|im_end|>\n' }}
-    {%- endif %}
-{%- endif %}
-{%- for message in messages %}
-    {%- if (message.role == "user") or (message.role == "system" and not loop.first) or (message.role == "assistant" and not message.tool_calls) %}
-        {{- '<|im_start|>' + message.role + '\n' + message.content + '<|im_end|>\n' }}
-    {%- elif message.role == "assistant" %}
-        {{- '<|im_start|>assistant' }}
-        {%- if message.content %}
-            {{- '\n' + message.content }}
-        {%- endif %}
-        {%- for tool_call in message.tool_calls %}
-            {%- if tool_call.function is defined %}
-                {%- set tool_call = tool_call.function %}
-            {%- endif %}
-            {{- '\n<tools>\n{"name": "' + tool_call.name + '", "arguments": ' + (tool_call.arguments | tojson) + '}\n</tools>' }}
-        {%- endfor %}
-        {{- '<|im_end|>\n' }}
-    {%- elif message.role == "tool" %}
-        {{- '<|im_start|>user\n<tool_response>\n' + message.content + '\n</tool_response><|im_end|>\n' }}
-    {%- endif %}
+{%- macro text_of(content) -%}
+{%- if content is string -%}
+{{- content }}
+{%- elif content is mapping -%}
+{{- content.get('text', content.get('content', '')) }}
+{%- elif content is sequence and content is not string -%}
+{%- for block in content -%}
+{%- if block is string -%}
+{{- block }}
+{%- elif block is mapping -%}
+{%- if block.get('type') == 'text' -%}
+{{- block.get('text', '') }}
+{%- elif block.get('type') == 'tool_result' -%}
+{{- text_of(block.get('content')) }}
+{%- elif block.get('type') == 'image' -%}
+{{- '[image]' }}
+{%- else -%}
+{{- block.get('text', '') }}
+{%- endif -%}
+{%- endif -%}
+{%- endfor -%}
+{%- else -%}
+{{- content }}
+{%- endif -%}
+{%- endmacro -%}
+
+{# Tool calls from either OpenAI tool_calls or Anthropic tool_use blocks. #}
+{%- macro call(name, arguments) -%}
+{"name": {{ name | tojson }}, "arguments": {% if arguments is string and arguments | trim | first == '{' %}{{ arguments | trim }}{% else %}{{ arguments | tojson }}{% endif %}}
+{%- endmacro -%}
+
+{# User content: plain text blocks stay plain, tool_result blocks keep the
+   <tool_response> wrapper so the model can tell an observation from an
+   instruction — same shape the role=='tool' branch emits. #}
+{%- macro user_content(content) -%}
+{%- if content is string -%}
+{{- content }}
+{%- elif content is sequence and content is not string -%}
+{%- for block in content -%}
+{%- if block is string -%}
+{{- block }}
+{%- elif block is mapping and block.get('type') == 'tool_result' -%}
+{{- '\n<tool_response>\n' + text_of(block.get('content')) + '\n</tool_response>' }}
+{%- elif block is mapping -%}
+{{- text_of(block) }}
+{%- endif -%}
+{%- endfor -%}
+{%- else -%}
+{{- text_of(content) }}
+{%- endif -%}
+{%- endmacro -%}
+
+{%- set first_msg = messages[0] if messages else none -%}
+{%- set system_content = '' -%}
+{%- if first_msg and first_msg.get('role') == 'system' -%}
+{%- set system_content = text_of(first_msg.get('content')) -%}
+{%- endif -%}
+
+{%- if tools -%}
+{{- '<|im_start|>system\n' }}
+{%- if system_content -%}
+{{- system_content }}
+{%- else -%}
+{{- 'You are Qwen, created by Alibaba Cloud. You are a helpful assistant.' }}
+{%- endif -%}
+{{- "\n\nTOOL ERROR POLICY:\n1. Analyze a tool error once.\n2. You may attempt ONE correction.\n3. If it fails again with the same or similar error, STOP immediately.\n4. NEVER repeat an identical tool call after 2 failures.\n5. Do not explain or apologize repeatedly. Report and continue with available info.\n6. A response marked retryable=false is final for that call.\n\nPATH RESOLUTION POLICY:\n- Use the path exactly as the user gave it. NEVER rewrite, shorten, normalize, abbreviate or 'fix' it.\n- Absolute paths stay absolute. Relative paths stay relative. Do not invent a directory, a filename, or an extension.\n- Never guess a path from memory or from a similar-looking one. If you do not have a path, ask or list the directory.\n- Copy long paths and filenames character for character, including case, dots, dashes and underscores.\n" }}
+{{- "\n\n# Tools\n\nYou may call one or more functions to assist with the user query.\n\nThe available functions are provided inside <tools></tools> tags:\n<tools>" }}
+{%- for tool in tools %}
+{{- "\n" }}
+{{- tool | tojson }}
 {%- endfor %}
-{%- if add_generation_prompt %}
-    {{- '<|im_start|>assistant\n' }}
-{%- endif %}
+{{- "\n</tools>\n\nIf you call a function, reply ONLY in this exact format:\n<tools>\n{\"name\": <function-name>, \"arguments\": <args-json-object>}\n</tools><|im_end|>\n" }}
+{%- else -%}
+{%- if system_content -%}
+{{- '<|im_start|>system\n' + system_content + '<|im_end|>\n' }}
+{%- else -%}
+{{- '<|im_start|>system\nYou are Qwen, created by Alibaba Cloud. You are a helpful assistant.<|im_end|>\n' }}
+{%- endif -%}
+{%- endif -%}
+{%- for message in messages %}
+{%- if message.role == 'system' and not loop.first -%}
+{{- '<|im_start|>system\n' + text_of(message.content) + '<|im_end|>\n' }}
+{%- elif message.role == 'user' -%}
+{{- '<|im_start|>user\n' + user_content(message.content) + '<|im_end|>\n' }}
+{%- elif message.role == 'assistant' -%}
+{{- '<|im_start|>assistant' }}
+{%- set assistant_text = '' -%}
+{%- if message.content is string -%}
+{%- set assistant_text = message.content -%}
+{%- elif message.content is sequence -%}
+{%- for block in message.content -%}
+{%- if block is mapping and block.get('type') == 'text' -%}
+{%- set assistant_text = assistant_text + block.get('text', '') -%}
+{%- endif -%}
+{%- endfor -%}
+{%- endif -%}
+{%- if assistant_text -%}
+{{- '\n' + assistant_text }}
+{%- endif -%}
+{%- for tool_call in (message.tool_calls or []) -%}
+{%- if tool_call.function is defined -%}
+{%- set tool_call = tool_call.function -%}
+{%- endif -%}
+{{- '\n<tools>\n' }}
+{{- call(tool_call.name, tool_call.arguments) }}
+{{- '</tools>' }}
+{%- endfor -%}
+{%- if message.content is sequence -%}
+{%- for block in message.content -%}
+{%- if block is mapping and block.get('type') == 'tool_use' -%}
+{{- '\n<tools>\n' }}
+{{- call(block.get('name'), block.get('input')) }}
+{{- '</tools>' }}
+{%- endif -%}
+{%- endfor -%}
+{%- endif -%}
+{{- '<|im_end|>\n' }}
+{%- elif message.role == 'tool' -%}
+{{- '<|im_start|>user\n<tool_response>\n' + text_of(message.content) + '\n</tool_response><|im_end|>\n' }}
+{%- endif -%}
+{%- endfor %}
+{%- if add_generation_prompt -%}
+{{- '<|im_start|>assistant\n' }}
+{%- endif -%}
