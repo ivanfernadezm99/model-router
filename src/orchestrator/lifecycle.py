@@ -149,6 +149,14 @@ class Orchestrator:
         if self.registry is None:
             raise RuntimeError("registry not configured")
 
+        # Switching to the model that is already serving is a no-op. This has
+        # to be checked BEFORE stop_current(): that call clears active_model,
+        # so the coalesce check inside the lock below would never match, and we
+        # would stop the model we were just asked to keep and start it again.
+        # A pointless swap that also reports success while doing it.
+        if target == self.active_model:
+            return True
+
         self.switching_to = target  # signal that a switch is in progress
         try:
             spec = self.registry.resolve(target)  # raises KeyError -> unknown model

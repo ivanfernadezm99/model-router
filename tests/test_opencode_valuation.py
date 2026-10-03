@@ -2,8 +2,8 @@
 
 Esta lógica fue restaurada el 2026-09-16 tras cache del front y bug de streaming:
 - Combo debe mostrar 1-5 con estrellas y base descriptiva
-- coder-14b-100k debe llevar 🤖 OPENCODE
-- default config debe ser coder-14b-100k para opencode
+- default config es coder-30b-190k (MAX-CONTEXTO, commit 7824057)
+- coder-14b-100k queda relegado a puesto 3, sin marca OPENCODE
 - TASK_TO_MODEL code -> coder-14b-100k
 - bench_30b_vs_14b.sh debe existir y ser ejecutable
 """
@@ -13,15 +13,20 @@ import json
 import yaml
 
 
-def test_combo_quality_tag_includes_opencode():
+def test_combo_quality_tag_ranks_30b_first_and_relegates_14b():
+    """30B ranks first, 14B is explicitly relegated.
+
+    Commit 7824057 promoted coder-30b-190k to default MAX-CONTEXTO and dropped
+    the OPENCODE branding that used to mark the 14B. These assertions track that
+    decision instead of the pre-7824057 world.
+    """
     html = pathlib.Path("web/templates/index.html").read_text()
-    # qualityTag para 14b debe contener OPENCODE
     assert "coder-14b-100k" in html
-    assert "OPENCODE" in html
     assert "3.5/5" in html or "coder-14b-100k" in html
-    # verifica que la función qualityTag tenga la base con OPENCODE
-    assert "✅ 14B estable 🤖 OPENCODE" in html
-    # verifica que qualityScore para 30b siga siendo 5.0
+    # 14B is present but explicitly demoted, not branded
+    assert "🥉 Qwen2.5-Coder-14B-Q4_K_M.gguf | DENSO 14B — ex-puesto 1, relegado" in html
+    assert "✅ 14B estable 🤖 OPENCODE" not in html
+    # qualityScore para 30b sigue siendo 5.0
     assert "if (name.includes('30b-q5')) return 5.0" in html
     assert "if (name === 'coder-30b-a3b') return 5.0" in html
 
@@ -35,9 +40,9 @@ def test_combo_stars_rendered():
     assert "o.textContent" in html and "stars" in html
 
 
-def test_config_default_is_14b_for_opencode():
+def test_config_default_is_30b_190k():
     cfg = yaml.safe_load(pathlib.Path("config.yaml").read_text())
-    assert cfg["defaults"]["model"] == "coder-14b-100k"
+    assert cfg["defaults"]["model"] == "coder-30b-190k"
     # 14b debe existir
     assert "coder-14b-100k" in cfg["models"]
     assert "coder-30b-a3b" in cfg["models"]
@@ -83,8 +88,8 @@ def test_front_media_viewer_present():
     assert "media-preview" in html
 
 
-def test_health_endpoint_reports_14b_default():
-    # el endpoint /api/models debe reportar default_model 14b
+def test_health_endpoint_reports_30b_190k_default():
+    # el endpoint /api/models debe reportar default_model 30b-190k
     # lo verificamos leyendo config, no haciendo request vivo
     cfg = yaml.safe_load(pathlib.Path("config.yaml").read_text())
-    assert cfg["defaults"]["model"] == "coder-14b-100k"
+    assert cfg["defaults"]["model"] == "coder-30b-190k"

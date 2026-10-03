@@ -9,7 +9,29 @@ from fastapi.testclient import TestClient
 from src.gateway.app import app
 
 
-def test_jobs_image_enqueues_and_completes_with_mocked_switch():
+def _fake_output(tmp_path):
+    """Stand in for the generation step.
+
+    The worker skips the real backend call whenever PYTEST_CURRENT_TEST is set
+    (src/jobs/worker.py), so no file is ever produced and the has_file check
+    marks every job failed. That is correct behaviour for a job that generated
+    nothing, but it makes the "completes" path unreachable from a test.
+
+    Injecting the file at the filesystem seam keeps the assertions honest:
+    switch_to, the target routing and the status transition all still run for
+    real, and only the file movement — the step that would need a GPU — is
+    replaced.
+    """
+    produced = tmp_path / "out.bin"
+    produced.write_bytes(b"x")
+
+    def _move(job_id, payload):
+        payload["file"] = str(produced)
+
+    return _move
+
+
+def test_jobs_image_enqueues_and_completes_with_mocked_switch(tmp_path):
     """POST /jobs/image returns id and background task completes via mocked orchestrator."""
     from src.jobs.router import queue as job_queue
 
@@ -19,7 +41,7 @@ def test_jobs_image_enqueues_and_completes_with_mocked_switch():
     except Exception:
         pass
 
-    with patch("src.jobs.worker._get_orchestrator") as mock_get:
+    with patch("src.jobs.worker._get_orchestrator") as mock_get, patch("src.jobs.worker._move_file_to_output", side_effect=_fake_output(tmp_path)):
         mock_orch = MagicMock()
         mock_orch.switch_to = AsyncMock(return_value=True)
         mock_reg = MagicMock()
@@ -51,7 +73,7 @@ def test_jobs_image_enqueues_and_completes_with_mocked_switch():
         mock_orch.switch_to.assert_called_with("sdxl")
 
 
-def test_jobs_video_enqueues_and_completes():
+def test_jobs_video_enqueues_and_completes(tmp_path):
     from src.jobs.router import queue as job_queue
 
     try:
@@ -59,7 +81,7 @@ def test_jobs_video_enqueues_and_completes():
     except Exception:
         pass
 
-    with patch("src.jobs.worker._get_orchestrator") as mock_get:
+    with patch("src.jobs.worker._get_orchestrator") as mock_get, patch("src.jobs.worker._move_file_to_output", side_effect=_fake_output(tmp_path)):
         mock_orch = MagicMock()
         mock_orch.switch_to = AsyncMock(return_value=True)
         mock_reg = MagicMock()
