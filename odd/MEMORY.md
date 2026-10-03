@@ -158,3 +158,20 @@ los caps y las lineas `Error executing`.
   Cubierto por `test_lifespan_starts_clean`; usar `with TestClient(app)`.
 - **Trampa de edicion**: `python3` con dos `write_text` sobre la misma `s` leida
   una vez -> el segundo write pisa el primero. Releer antes de cada write.
+
+## SIGKILL al modelo 30B — problema preexistente, NO del gateway
+
+- `llama-code-30b-190k.service` recibe SIGKILL externo periodicamente:
+  `Main process exited, code=killed, status=9/KILL`. systemd no lo manda
+  (eso seria SIGTERM + "Stopping"). Ocurre con el modelo **sirviendo**, no al
+  cargar. Preexistente: hay SIGKILL a las 22:37 y 23:25, antes de esta sesion.
+- Indicio fuerte de OOM killer: 31Gi RAM totales, 732Mi libres, 10Gi de swap
+  usada (9.8Gi en swapfile2). llama-server ~5.7Gi RSS + chrome ~1Gi x3 +
+  opencode ~1.6Gi. La unidad no tiene MemoryMax/MemoryHigh (infinity) y
+  `OOMPolicy=stop`.
+- **No confirmable sin root**: `sudo` pide password y `journalctl -k` no es
+  accesible como usuario. Para confirmarlo hace falta(root o|Uso de root para ver kernel journal).
+- Durante esto falló una verificacion mia de tool_calls con `KeyError: 'choices'`:
+  la respuesta cruda era `503 Loading model`. NO era una regresion del fix, era
+  el modelo muriendose. Verificar SIEMPRE el 8082 antes de concluir que algo
+ and broke.
