@@ -37,7 +37,27 @@ Los agentes (opencode → `http://127.0.0.1:8000/v1`, confirmado en `~/.config/o
 
 ## Progreso
 
-### T1 — Reescribir el template con normalización de content y arguments
+### T1 — Reescribir el template con normalización de content y arguments — DONE
 - Route: inline (1 archivo no trivial + 1 test mecánico, contexto completo ya leído)
 - Trigger: `writer rule` no dispara — el template es un solo archivo ya entendido; el test es mecánico.
-- [ ] T1 hecho
+- Commit: `9d4f938` en rama `fix/tool-path-resolution`
+- Archivos: `templates/qwen25-coder-tools.jinja`, `tests/test_chat_template.py`
+
+**Evidencia de verificación**
+- `python3 -m pytest tests/test_chat_template.py -q` → 18 passed
+- `python3 -m pytest tests/ -q` → 76 passed, 6 failed. Los 6 fallos son PREEXISTENTES: se.corrieron sobre el árbol limpio con `git stash` y fallan idéntico (`test_e2e_queue`, 2× `test_jobs_wiring`, 3× `test_opencode_valuation`). Ninguno toca el template.
+- Render manual con payload Anthropic: `arguments` sale como objeto `{"filePath": "/home/servidor/x/proxy.py"}` y el `tool_result` sale envuelto en `<tool_response>`.
+
+## Criterios de aceptación — estado
+- [x] El template renderiza sin excepción con payload Anthropic (content como lista de bloques)
+- [x] `arguments` se renderiza como objeto JSON, no como string escapado
+- [x] `tool_result` de un turno previo aparece en el prompt renderizado
+- [x] El system prompt y los ejemplos coinciden en el formato de `arguments`
+- [x] El path absoluto que emite el modelo sobrevive round-trip
+
+## Pendiente (NO autorizado, requiere decisión aparte)
+- **Sampler override** en `src/gateway/proxy.py:99-157`: pisa la sampling del cliente en 1424/1424 requests con `dry_allowed_length: 2`, `repeat_penalty: 1.15`, `top_k: 20`, `temperature: 0.2`, `top_p: 0.85`. DRY con `allowed_length: 2` penaliza la repetición — y un path ES repetición. Es el segundo mecanismo que arruina paths aun cuando el template ya está bien.
+- **Typo `-np 4--kv-unified`** en `~/.config/systemd/user/llama-code-30b-a3b.service` (instalada, no solo el repo). `coder-30b-a3b` no arranca.
+- **Template Qwen2.5 sobre modelos Qwen3-Coder**: los `coder-30b-*` son Qwen3-Coder pero usan `qwen25-coder-tools.jinja`. Los tags nativos de tool call de Qwen3 difieren. Decisión de modelo, no de template.
+- `systemd/user/` desincronizado de `~/.config/systemd/user/`: faltan `llama-code-30b-150k.service`, `llama-code-30b-190k.service` (el default) y `llama-code-30b-q5-100k.service` en el repo.
+
