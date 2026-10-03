@@ -68,6 +68,28 @@ una decision del usuario.
 
 ---
 
+## 2026-10-03 — Guard de minja en la suite
+
+`tests/test_template_minja.py` corre el harness real de llama.cpp
+(`test-chat-template --with-tools`) contra ambas plantillas y afirma sobre el
+bloque de capabilities. 9 tests, ~1s con templates sanos.
+
+- Afirma `supports_tools`, `supports_tool_calls`, `supports_object_arguments`
+  en `true`, mas cero lineas `Error executing`.
+- Incluye `test_guard_can_actually_fail`, que verifica con un template sin tool
+  handling que los caps dan `false`. Sin ese test, el guard podria quedar
+  vacuo y pasar siempre.
+- Se saltea solo si el harness no esta compilado, asi la suite corre igual en
+  una maquina sin build local de llama.cpp.
+- Verificado que atrapa regresiones: revirtiendo el guard
+  `is not string` el suite falla 4 tests.
+
+**Aprendido**: el exit code del harness es 0 incluso con template roto
+(`{{ x | trim }}` sobre undefined no ejecuta el filtro). La unica senal util son
+los caps y las lineas `Error executing`.
+
+---
+
 ## Deuda abierta (deliberada, NO tocar)
 
 - `TASK_TO_MODEL["code"]` sigue en `coder-14b-100k` mientras `config.yaml`
