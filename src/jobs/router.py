@@ -12,6 +12,7 @@ import json
 
 from src.jobs.queue import JobQueue
 from src.jobs.worker import _get_orchestrator, _run_job_async
+from src.gateway.adopt import reconcile_active_model
 
 router = APIRouter(prefix="/jobs")
 
@@ -184,6 +185,11 @@ async def switch_model(req: SwitchRequest) -> Dict[str, str]:
     # bloquear si ya hay un switch en curso (flag switching_to del orchestrator)
     if orchestrator.switching_to is not None:
         return {"model": req.model, "status": "busy", "detail": f"switch en curso a {orchestrator.switching_to}, esperá"}
+
+    # Un gateway reiniciado arranca con active_model=None mientras el modelo
+    # sigue corriendo. Sin reconciliar, comparar contra None da "no soy yo" y
+    # esta ruta recarga un modelo que ya está cargado: ~100s de downtime por nada.
+    await reconcile_active_model(orchestrator, registry)
 
     if orchestrator.active_model == req.model:
         LAST_SWITCH.update({"model": req.model, "status": "already_active", "detail": "ya estaba cargado"})

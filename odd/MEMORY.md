@@ -136,3 +136,25 @@ los caps y las lineas `Error executing`.
 - Al reiniciar el gateway, `active_model` queda `None` hasta un adopt exitoso.
   Mientras el 30B carga (503 durante ~100s) TODO request da 409 "cargá un modelo
   manualmente". Es preexistente, no del guard; esperar a que `/props` responda.
+
+## active_model era estado ficticio — reconciliado con systemd
+
+- `orchestrator.active_model` vive en memoria: arranca en `None` en cada restart
+  del gateway mientras el modelo sigue corriendo. Eso hacia que
+  `POST /jobs/switch` recargara un modelo YA cargado (~100s de downtime por nada).
+  Verificado: 202 "switching" + modelo 503 -> 200 cuando ya estaba corriendo.
+- **`src/gateway/adopt.py`**: la discriminacion la hace la unidad systemd, NO el
+  puerto. Trece modelos de coder comparten el 8082, asi que un puerto sano
+  prueba que hay algo cargado pero nunca cual. El puerto es solo gate de
+  readiness (una unidad queda "active" mientras sus pesos siguen cargando y
+  llama-server responde 503).
+- `reconcile_until_ready` reintenta hasta 300s: un reconcile one-shot pierde la
+  carrera contra un modelo que recien arranca, que es justo cuando se reinicia
+  el stack.
+- `reconcile_active_model` NUNCA sobreescribe un `active_model` ya seteado:
+  `switch_to` es dueno de ese estado durante un swap exclusivo.
+- **Trampa de tests**: `TestClient(app)` SIN `with` no corre el lifespan. Un
+  NameError en el startup task paso los 167 tests con el gateway en crash-loop.
+  Cubierto por `test_lifespan_starts_clean`; usar `with TestClient(app)`.
+- **Trampa de edicion**: `python3` con dos `write_text` sobre la misma `s` leida
+  una vez -> el segundo write pisa el primero. Releer antes de cada write.

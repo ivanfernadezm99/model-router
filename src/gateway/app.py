@@ -4,11 +4,13 @@ import json
 import logging
 import time
 import uuid
+import asyncio
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse, PlainTextResponse, Response
 
+from src.gateway.adopt import reconcile_active_model, reconcile_until_ready
 from src.gateway.detector import detect_task, task_to_model
 from src.gateway.metrics import health_payload, metrics_text
 from src.gateway.proxy import proxy_request
@@ -46,9 +48,15 @@ reaper = IdleReaper(orchestrator)
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     reaper.start()
+    # Reconcile in the background: a gateway restart must not leave the gateway
+    # blind to a model that is still running. Doing it here rather than waiting
+    # for someone to poll /health is what makes POST /jobs/switch see the truth
+    # before it decides to reload an already-loaded model.
+    reconcile_task = asyncio.create_task(reconcile_until_ready(orchestrator, registry))
     try:
         yield
     finally:
+        reconcile_task.cancel()
         reaper.stop()
 
 
@@ -90,45 +98,9 @@ async def debug_health():
 
 @app.get("/health")
 async def health():
-    # si active_model es None, adoptar el servicio systemd activo que esté
-    # saludable (no solo "active" en systemd, que puede estar cayendo).
-    if orchestrator.active_model is None:
-        logger.info("auto-detect: starting, active_model=None")
-        try:
-            import subprocess
-            import httpx
-            models = getattr(registry, "models", {}) or {}
-            logger.info(f"auto-detect: registry has {len(models)} models")
-            async with httpx.AsyncClient(timeout=3) as client:
-                for name, spec in models.items():
-                    svc = spec.get("service")
-                    port = spec.get("port")
-                    endpoint = spec.get("health_endpoint", "/health")
-                    if not svc or not port:
-                        continue
-                    r = subprocess.run(
-                        ["systemctl", "--user", "is-active", svc],
-                        capture_output=True, text=True, timeout=2,
-                        env={"XDG_RUNTIME_DIR": "/run/user/1000", "DBUS_SESSION_BUS_ADDRESS": "unix:path=/run/user/1000/bus"},
-                    )
-                    sysd_status = r.stdout.strip()
-                    logger.info(f"auto-detect: {name} svc={svc} systemd={sysd_status}")
-                    if sysd_status != "active":
-                        continue
-                    try:
-                        hr = await client.get(f"http://127.0.0.1:{port}{endpoint}")
-                        logger.info(f"auto-detect: {name} health={hr.status_code}")
-                        if hr.status_code == 200:
-                            orchestrator.active_model = name
-                            orchestrator.active_service = svc
-                            logger.info(f"auto-detect: adopted {name}")
-                            break
-                    except Exception as e:
-                        logger.info(f"auto-detect: {name} health error: {e}")
-                        continue
-            logger.info(f"auto-detect: final active_model={orchestrator.active_model}")
-        except Exception as e:
-            logger.info(f"auto-detect: exception: {e}")
+    # A healthy port is not enough to name the model — thirteen coder models
+    # share 8082 — so adoption goes through systemd unit state first.
+    await reconcile_active_model(orchestrator, registry)
     return JSONResponse(health_payload(orchestrator, queue))
 
 
