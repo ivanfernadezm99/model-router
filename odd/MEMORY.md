@@ -214,3 +214,26 @@ Verificacion en viva OK: `finish_reason=tool_calls`, `read_file`, path absoluto
 **Si vuelve a morir con SIGKILL en 150K:** el contexto no era la causa. Bajar a
 140000 solo libera ~86Mi mas, asi que no vale la pena — el culpable es otro proceso
 comiendose la RAM. Para confirmar hace falta(root o|Uso de root para ver kernel journal).
+
+## Instrumentacion del SIGKILL (2026-10-03, commit pending)
+
+Todo en `src/orchestrator/lifecycle.py` + `src/gateway/proxy.py` +
+`scripts/tripwire.py` + `tests/test_sigkill_instrumentation.py`.
+
+- `_port_occupant_pids(port)`: PIDs + cmdline en un puerto, validando /proc
+  (si no, `fuser -v 8082/tcp` reporta el 8082 como PID).
+- `_kill_port_occupants`: loguea PIDs/contexto antes de `fuser -k`, y tiene
+  GUARD que se niega a matar si `active_service` esta entre los ocupantes.
+- `switch_to`: `SWITCH-BEGIN`, `SWITCH-STOP-SET`, `SWITCH-BLOCKED-HOLDS`.
+- proxy: `BACKEND-5XX` ahora con method+path+body (el 5xx precede 1s a cada
+  muerte y no se sabia que request era).
+- `model-router-tripwire.service`: watcher 3s -> `logs/tripwire.jsonl` con el
+  contexto completo de cada muerte.
+
+**Correccion importante:** la hipotesis de que `to_stop` metia a todos los
+coder (13 en 8082) era FALSA. `stop_current()` corre antes del lock y ya
+pone active_service=None. Un test lo demostro. El riesgo real queda en
+`fuser -k {port_del_target}/tcp`.
+
+**Geteo de la clave:** el OOM ya no es la hipotesis (kern.log sin eventos OOM,
+systemd-oomd inactive). El SIGKILL sigue sin causa cerrada.

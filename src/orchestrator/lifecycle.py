@@ -1,9 +1,11 @@
 """Exclusive systemd lifecycle — asyncio.Lock, stop-before-start, -np 1, holds, VRAM guard."""
 
 import asyncio
+import json
 import logging
 import re
 import subprocess
+from pathlib import Path
 
 import httpx
 
@@ -85,21 +87,100 @@ def _run_systemctl(action: str, service: str) -> subprocess.CompletedProcess:
     )
 
 
-def _kill_port_occupants(port: int) -> bool:
+def _port_occupant_pids(port: int) -> list[dict]:
+    """PIDs escuchando en un puerto TCP, con su cmdline. Solo lectura.
+
+    Esto existe para que un SIGKILL sea atribuible. `fuser -k` es la unica
+    llamada capaz de producir `status=9/KILL` en el repo, y hasta ahora
+    cuando se ejecutaba no dejaba rastro de a quien mato.
+    """
+    try:
+        res = subprocess.run(
+            ["fuser", "-v", f"{int(port)}/tcp"],
+            capture_output=True, text=True, timeout=10,
+        )
+        blob = f"{res.stdout}\n{res.stderr}"
+    except Exception as exc:
+        logger.warning("port occupant scan failed port=%s err=%s", port, exc)
+        return []
+
+    pids: list[int] = []
+    for tok in blob.replace("/", " ").replace(":", " ").split():
+        if tok.isdigit():
+            pids.append(int(tok))
+
+    out, seen = [], set()
+    for pid in pids:
+        if pid in seen:
+            continue
+        # `fuser -v 8082/tcp` imprime tambien el numero de puerto en su salida;
+        # validar contra /proc descarta esos tokens sin proceso real.
+        proc = Path(f"/proc/{pid}/cmdline")
+        if not proc.exists():
+            continue
+        seen.add(pid)
+        try:
+            cmd = proc.read_bytes().replace(b"\x00", b" ").decode("utf-8", "replace").strip()
+        except Exception:
+            cmd = "<unreadable>"
+        out.append({"pid": pid, "cmd": cmd[:220]})
+    return out
+
+
+def _kill_port_occupants(
+    port: int,
+    *,
+    target: str | None = None,
+    active_model: str | None = None,
+    active_service: str | None = None,
+    shared_with: list[str] | None = None,
+    reason: str = "",
+) -> bool:
     """Mata procesos huérfanos escuchando en el puerto (unit borrada, kill manual,
     crash sin cleanup). Último recurso antes de arrancar: sin esto, el nuevo
     server muere con bind failed y el health le da OK al impostor viejo.
-    Retorna True si el puerto quedó libre."""
+    Retorna True si el puerto quedó libre.
+
+    `fuser -k` manda SIGKILL. Antes de matar registra puerto, PIDs, cmdlines,
+    target, modelo activo y que modelos del registry comparten el puerto, para
+    que un `status=9/KILL` en el journal sea atribuible a este call site.
+    """
+    port = int(port)
+    occupants = _port_occupant_pids(port)
+    logger.warning(
+        "SIGKILL-PORT-BEGIN port=%s reason=%s target=%s active_model=%s "
+        "active_service=%s shared_with=%s occupants=%s",
+        port, reason, target, active_model, active_service,
+        shared_with or [], json.dumps(occupants),
+    )
+
+    # Guard: nunca SIGKILL al servicio que el gateway cree estar sirviendo. Un
+    # puerto compartido (8082 tiene 13 modelos) hace que `fuser -k` alcance a
+    # todos los que esten vivos en el. Si el modelo activo esta ahi, el switch
+    # esta a punto de matar al servidor que el usuario esta usando: fallar
+    # honesto es mejor que un SIGKILL sin atribucion.
+    if active_service and any(active_service in (o.get("cmd") or "") for o in occupants):
+        logger.error(
+            "SIGKILL-PORT-REFUSED port=%s active_service=%s esta entre los "
+            "ocupantes; no se ejecuta fuser -k para no matar al modelo en servicio",
+            port, active_service,
+        )
+        return False
+
     try:
-        subprocess.run(
-            ["fuser", "-k", f"{int(port)}/tcp"],
+        res = subprocess.run(
+            ["fuser", "-k", f"{port}/tcp"],
             capture_output=True,
             text=True,
             timeout=15,
         )
     except Exception as exc:
-        logger.warning("fuser kill failed port=%s err=%s", port, exc)
+        logger.warning("SIGKILL-PORT-FAILED port=%s err=%s", port, exc)
         return False
+    logger.warning(
+        "SIGKILL-PORT-DONE port=%s rc=%s stdout=%r stderr=%r",
+        port, res.returncode, (res.stdout or "").strip()[:200], (res.stderr or "").strip()[:200],
+    )
     return True
 
 
@@ -162,7 +243,16 @@ class Orchestrator:
             spec = self.registry.resolve(target)  # raises KeyError -> unknown model
             validate_np(spec.get("args", []), spec.get("service"))
 
+            logger.warning(
+                "SWITCH-BEGIN target=%s target_service=%s target_port=%s active_model=%s active_service=%s",
+                target, spec.get("service"), spec.get("port"),
+                self.active_model, self.active_service,
+            )
+
             if not self._check_holds(target):
+                logger.warning(
+                    "SWITCH-BLOCKED-HOLDS target=%s active_model=%s", target, self.active_model,
+                )
                 notify_error(f"Switch bloqueado: holds faltan", f"target={target} — cuda/kornia no disponibles")
                 return False
 
@@ -194,12 +284,21 @@ class Orchestrator:
                 to_stop = {spec["service"]}
                 if self.active_service:
                     to_stop.add(self.active_service)
+                same_port: list[str] = []
                 for _name, _spec in (self.registry.models or {}).items():
                     try:
                         if int(_spec.get("port")) == port:
                             to_stop.add(_spec["service"])
+                            same_port.append(_name)
                     except Exception:
                         continue
+                logger.warning(
+                    "SWITCH-STOP-SET target=%s port=%s active_model=%s active_service=%s "
+                    "active_in_to_stop=%s to_stop=%s same_port_models=%s",
+                    target, port, self.active_model, self.active_service,
+                    self.active_service in to_stop if self.active_service else False,
+                    sorted(to_stop), sorted(same_port),
+                )
                 for svc in sorted(to_stop):
                     try:
                         _run_systemctl("stop", svc)
@@ -216,7 +315,14 @@ class Orchestrator:
                 # Si ni así libera, fallar honesto en vez de adoptar un impostor.
                 if not await wait_port_free(port, spec["health_endpoint"]):
                     logger.warning("port occupied, killing orphans port=%s target=%s", port, target)
-                    _kill_port_occupants(port)
+                    _kill_port_occupants(
+                        port,
+                        target=target,
+                        active_model=self.active_model,
+                        active_service=self.active_service,
+                        shared_with=sorted(same_port),
+                        reason="wait_port_free failed before starting target",
+                    )
                     for _ in range(10):
                         used_now = get_vram_used_mb()
                         if used_now is not None and used_now < 2048:

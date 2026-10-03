@@ -219,7 +219,15 @@ async def test_orphan_port_occupant_killed():
                             with patch("src.orchestrator.lifecycle._kill_port_occupants", return_value=True) as killer:
                                 ok = await orch.switch_to("sdxl")
                                 assert ok is True
-                                killer.assert_called_once_with(8188)
+                                # La llamada ahora lleva contexto para que un
+                                # SIGKILL de `fuser -k` sea atribuible: puerto
+                                # posicional + target/active/shared/reason.
+                                killer.assert_called_once()
+                                args, kwargs = killer.call_args
+                                assert args[0] == 8188
+                                assert kwargs["target"] == "sdxl"
+                                assert "reason" in kwargs
+                                assert "shared_with" in kwargs
 
 
 @pytest.mark.asyncio

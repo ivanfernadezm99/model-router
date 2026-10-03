@@ -1,0 +1,13 @@
+[Unit]
+Description=Model-router SIGKILL tripwire (graba contexto en cada muerte de un llama-* service)
+After=default.target
+
+[Service]
+Type=simple
+ExecStart=/usr/bin/python3 %h/Descargas/model-router/scripts/tripwire.py --interval 3
+Restart=always
+RestartSec=10
+Environment=PYTHONUNBUFFERED=1
+
+[Install]
+WantedBy=default.target

@@ -159,3 +159,82 @@ OOM killer sin `sudo`. (Engram MCP además está caído con
    timeout menor y no arrastrar al modelo activo.
 4. Averiguar qué pide un 500 en 8082 justo antes de cada muerte — puede ser
    la causa(queue cheia, request inválido) y no el síntoma.
+
+---
+
+## 9. Correccion: la hipotesis del `to_stop` era incorrecta
+
+Un test agregado (`tests/test_sigkill_instrumentation.py`) la desmentio.
+
+`switch_to` llama `stop_current()` en la linea 180, **antes** del `async with
+self.lock`. Ese `stop_current()` ya hace `self.active_service = None` y
+`self.active_model = None` (lifecycle.py:140-141). Recien despues, en la linea
+195, se evalua `if self.active_service: to_stop.add(...)`.
+
+Consecuencia: **`to_stop` nunca llega a contener al modelo activo.** El riesgo
+que plantee en la seccion 3 ("13 coder comparten 8082, un switch mete a todos en
+to_stop") no se materializa por ese camino. El modelo activo ya fue parado con
+SIGTERM via `systemctl stop` antes de llegar ahi.
+
+Lo que si queda en pie: `_kill_port_occupants(port)` se sigue invocando con el
+puerto del TARGET, y `fuser -k {port}/tcp` mata a cualquier proceso en ese
+puerto. Si el target esta en 8082 y hay un coder vivo ahi, lo mata.
+
+## 10. Instrumentacion agregada
+
+### `_port_occupant_pids(port)` — lifecycle.py
+Enumera PIDs en un puerto con su cmdline, validando contra `/proc` (el texto de
+`fuser -v 8082/tcp` incluye el numero de puerto y lo parsea como PID si no se
+filtra).
+
+### `_kill_port_occupants(...)` — ahora instrumentado y con guard
+- Loguea `SIGKILL-PORT-BEGIN` con puerto, motivo, target, modelo activo,
+  servicio activo, modelos siblings del puerto y los PIDs+cmdlines SIEMPRE
+  antes de matar.
+- **Guard**: si `active_service` esta entre los ocupantes, NO ejecuta
+  `fuser -k` y devuelve False. Falla honesto en vez de hacer un SIGKILL sin
+  atribucion sobre el modelo que el usuario esta usando.
+- Loguea `SIGKILL-PORT-DONE` con rc y stdout/stderr.
+- Firma retro-compatible: los nuevos params son keyword-only con default, asi
+  que el patch `return_value=True` del test preexistente sigue funcionando.
+
+### `switch_to` — traza completa
+- `SWITCH-BEGIN`: target, service, port, modelo/servicio activo **antes** del stop.
+- `SWITCH-STOP-SET`: port, `active_in_to_stop`, `to_stop` completo, y que
+  modelos del registry comparten el puerto.
+- `SWITCH-BLOCKED-HOLDS`: cuando corta por holds.
+
+### `proxy.py` — el 5xx que precede a cada muerte
+`BACKEND-5XX` con request_id, status, **method**, **path**, port, hint, modelo y
+los primeros 300 bytes del body. Antes solo se logueaba request_id+status.
+
+### `scripts/tripwire.py` + `model-router-tripwire.service`
+Como no hay root para ver al sender del SIGKILL, un watcher cada 3s graba en
+`logs/tripwire.jsonl` el contexto exacto de cada muerte: estado previo,
+MainPID, ExecMainCode/ExecMainStatus, NRestarts, snapshot de memoria + PSI,
+sockets conectados al 8082, y las ultimas lineas del journal del servicio y de
+`router-errors.log`.
+
+ corre con `systemctl --user enable --now model-router-tripwire.service`.
+
+## 11. Estado al 2026-10-03 10:56
+
+- Tripwire: active, `logs/tripwire.jsonl`.
+- Gateway: active, 0 reinicios, instrumentacion viva.
+- Modelo `coder-30b-190k` (n_ctx 150016): health 200, VRAM 18421MB.
+- Verificacion en vivo: `finish_reason=tool_calls`, `read_file` con path
+  absoluto `/tmp/opencode/live_probe.txt` intacto. **Sirve para probar.**
+- Suite: **176 passed, 2 warnings** (antes 168; +8 de instrumentacion).
+
+## 12. Que falta para cerrar la causa raiz
+
+El proximo SIGKILL tiene que aparecer en `logs/tripwire.jsonl` con:
+- Si hay `SIGKILL-PORT-BEGIN` -> el culpable es `fuser -k` y ya vamos a saber
+  que PID y por que puerto.
+- Si NO hay `SIGKILL-PORT-BEGIN` -> el SIGKILL viene de afuera del proceso del
+  gateway, y ahi el tripwire dira que habia conectado al 8082 y que estaba
+  haciendo el gateway en ese instante.
+
+Sin un evento todavia, cualquier conclusion sobre la causa sigue siendo
+especulacion. La instrumentacion esta puesta para que la proxima muerte sea
+atribuible en vez de adivinada.

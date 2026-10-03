@@ -87,3 +87,11 @@
 2026-10-03 09:07:03 | Switch timeout: sdxl | health 8188/system_stats no respondió en 1200s — modelo no cargó
 2026-10-03 09:07:03 | Switch bloqueado: holds faltan | target=sdxl — cuda/kornia no disponibles
 2026-10-03 09:07:03 | Switch bloqueado: holds faltan | target=sdxl — cuda/kornia no disponibles
+2026-10-03 10:53:23 | Backend 5xx port 8082 | request_id=b039416e status=500 hint= target=port:8082
+2026-10-03 10:53:25 | Switch timeout: sdxl | health 8188/system_stats no respondió en 1200s — modelo no cargó
+2026-10-03 10:53:25 | Switch bloqueado: holds faltan | target=sdxl — cuda/kornia no disponibles
+2026-10-03 10:53:25 | Switch bloqueado: holds faltan | target=sdxl — cuda/kornia no disponibles
+2026-10-03 10:55:33 | Backend 5xx port 8082 | request_id=ccd8ba79 status=500 hint= target=port:8082
+2026-10-03 10:55:34 | Switch timeout: sdxl | health 8188/system_stats no respondió en 1200s — modelo no cargó
+2026-10-03 10:55:34 | Switch bloqueado: holds faltan | target=sdxl — cuda/kornia no disponibles
+2026-10-03 10:55:34 | Switch bloqueado: holds faltan | target=sdxl — cuda/kornia no disponibles

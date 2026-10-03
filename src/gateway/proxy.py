@@ -188,6 +188,14 @@ async def proxy_request(request: Request, target_port: int, retry_after: int | N
 
         # notify on backend 5xx — visible in Telegram + file log
         if resp.status_code >= 500:
+            # Un 5xx en 8082 aparece ~1s antes de cada SIGKILL del 30B. No se
+            # tiene idea de que request lo provoca, asi que se registra el
+            # metodo y el path: sin eso no se puede correlacionar.
+            logger.warning(
+                "BACKEND-5XX request_id=%s status=%s method=%s path=%s port=%s hint=%s model=%s body_head=%r",
+                request_id, resp.status_code, request.method, request.url.path,
+                target_port, hint, target_model, (body or b"")[:300],
+            )
             notify_error(
                 f"Backend 5xx port {target_port}",
                 f"request_id={request_id} status={resp.status_code} hint={hint} target={target_model}",
