@@ -59,12 +59,19 @@ models:
     health_endpoint: /health
     vram_mb: 18000
     args: ["--model", "/home/servidor/Modelos/Qwen3-Coder/Qwen3-Coder-30B-A3B-Instruct-Q4_K_M.gguf", "-c", "150000", "-np", "1", "--ctx-size", "150000", "--rope-scaling", "yarn", "--yarn-orig-ctx", "32768", "-ctk", "q4_0", "-ctv", "q4_0", "-ngl", "99", "--kv-unified", "--flash-attn", "on", "--jinja", "--chat-template-file", "/home/servidor/Descargas/model-router/templates/qwen25-coder-tools.jinja", "--alias", "local-template"]
+  # ATENCION — la clave dice 190k pero el contexto real es 150000.
+  # Bajado desde 190000 el 2026-10-03: la unidad recibia SIGKILL externo
+  # (status=9/KILL) con solo 347Mi de RAM libre y 8Gi de swap usada. Bajar el
+  # contexto reduce el KV cache en RAM de ~4.90GiB a ~3.87GiB (-1.03GiB).
+  # La clave y el nombre del unit NO se renombraron para no romper
+  # defaults.model, web/app.py y las pruebas que referencian coder-30b-190k.
+  # Debt pendiente: renombrar a coder-30b-150k (ya existe esa entrada con unit).
   coder-30b-190k:
     service: llama-code-30b-190k.service
     port: 8082
     health_endpoint: /health
-    vram_mb: 22000
-    args: ["--model", "/home/servidor/Modelos/Qwen3-Coder/Qwen3-Coder-30B-A3B-Instruct-Q4_K_M.gguf", "-c", "190000", "-np", "1", "--ctx-size", "190000", "--rope-scaling", "yarn", "--yarn-orig-ctx", "32768", "-ctk", "q4_0", "-ctv", "q4_0", "-ngl", "99", "-np", "1", "--kv-unified", "--no-kv-offload", "--flash-attn", "on", "--jinja", "--chat-template-file", "/home/servidor/Descargas/model-router/templates/qwen25-coder-tools.jinja", "--alias", "local-template"]
+    vram_mb: 18000
+    args: ["--model", "/home/servidor/Modelos/Qwen3-Coder/Qwen3-Coder-30B-A3B-Instruct-Q4_K_M.gguf", "-c", "150000", "--ctx-size", "150000", "--rope-scaling", "yarn", "--yarn-orig-ctx", "32768", "-ctk", "q4_0", "-ctv", "q4_0", "-ngl", "99", "-np", "1", "--kv-unified", "--no-kv-offload", "--flash-attn", "on", "--jinja", "--chat-template-file", "/home/servidor/Descargas/model-router/templates/qwen25-coder-tools.jinja", "--alias", "local-template"]
   coder-30b-q5-100k:
     service: llama-code-30b-q5-100k.service
     port: 8082
@@ -108,7 +115,7 @@ models:
     vram_mb: 6500
     args: ["--listen", "127.0.0.1", "--port", "8188"]
 defaults:
-  model: coder-30b-190k  # 🥇 PUESTO 1 OPENCODE MAX-CONTEXTO — Qwen3-Coder-30B-A3B Q4 190K (22GB VRAM, YaRN 5.9x) — usa toda la VRAM, determinístico temp 0.2 + DRY para no alucinar
+  model: coder-30b-190k  # 🥇 PUESTO 1 OPENCODE MAX-CONTEXTO — Qwen3-Coder-30B-A3B Q4, contexto REAL 150K (la clave dice 190k, ver nota arriba; bajada desde 190K por RAM), YaRN 5.9x — determinístico temp 0.2 + DRY para no alucinar
   # 🥈 PUESTO 2 OPENCODE — Qwen3-Coder-30B-A3B Q4 100K (coder-30b-a3b) — 12GB VRAM, mejor calidad por YaRN bajo (3.1x), opción estable
   # 🥉 PUESTO 3 OPENCODE — Qwen2.5-Coder-14B Q4 100K (coder-14b-100k) — ex-puesto 1 hasta 2026-09-18, relegado
   idle_timeout_seconds: 600

@@ -1,0 +1,1052 @@
+- generic [ref=e2]:
+  - generic [ref=e3]:
+    - generic [ref=e8]:
+      - generic [ref=e9]:
+        - img "Enlaces Chaco POS" [ref=e11]
+        - heading "Tu negocio, bajo control total con un solo sistema" [level=1] [ref=e12]:
+          - text: Tu negocio,
+          - text: bajo control total
+          - text: con un solo sistema
+        - paragraph [ref=e13]
+        - generic [ref=e17]:
+          - generic [ref=e18]:
+            - generic [ref=e19]: 
+            - generic [ref=e20]: "7.715"
+          - generic [ref=e21]: páginas vistas
+          - generic [ref=e22]: — últimos 30 días
+          - generic [ref=e23]:
+            - generic [ref=e24]: 
+            - text: Cloudflare
+        - generic [ref=e25]:
+          - generic [ref=e26]:
+            - generic [ref=e27]: 500+
+            - text: Ventas procesadas por día
+          - generic [ref=e28]:
+            - generic [ref=e29]: 100%
+            - text: Compatible con ARCA
+          - generic [ref=e30]:
+            - generic [ref=e31]: 24/7
+            - text: Resistente a cortes
+        - generic [ref=e32]:
+          - link " Solicitar Demo Gratis" [ref=e33] [cursor=pointer]:
+            - /url: https://wa.me/543624782201?text=Hola!%20Me%20interesa%20una%20demo%20del%20sistema%20POS%20Enlaces%20Chaco
+            - generic [ref=e34]: 
+            - text: Solicitar Demo Gratis
+          - link " Ver funcionalidades" [ref=e35] [cursor=pointer]:
+            - /url: "#funcionalidades"
+            - generic [ref=e36]: 
+            - text: Ver funcionalidades
+      - generic [ref=e38]:
+        - generic [ref=e39]:
+          - generic [ref=e40]: 
+          - text: Punto de Venta
+        - generic [ref=e41]:
+          - generic [ref=e42]: 
+          - text: Factura Electrónica
+        - generic [ref=e43]:
+          - generic [ref=e44]: 
+          - text: Stock & Inventario
+        - generic [ref=e45]:
+          - generic [ref=e46]: 
+          - text: E-Commerce
+    - generic [ref=e49] [cursor=pointer]: 
+  - region "Galería de productos y promociones de Enlaces Chaco" [ref=e50]:
+    - generic [ref=e51]:
+      - link "Canciones personalizadas con IA — ¡Nuevo lanzamiento!  NUEVO" [ref=e52] [cursor=pointer]:
+        - /url: https://canciones.enlaceschaco.ar/#/canciones/landing
+        - img "Canciones personalizadas con IA — ¡Nuevo lanzamiento!" [ref=e53]
+        - generic [ref=e54]:
+          - generic [ref=e55]: 
+          - text: NUEVO
+      - link "Redes Sociales con IA — automatizá tus publicaciones" [ref=e56] [cursor=pointer]:
+        - /url: https://wa.me/543624782201?text=Hola!%20Me%20interesa%20el%20m%C3%B3dulo%20de%20Redes%20Sociales%20con%20IA
+        - img "Redes Sociales con IA — automatizá tus publicaciones" [ref=e57]
+      - link "Partners de TiendaNube — sumá el ecosistema" [ref=e58] [cursor=pointer]:
+        - /url: "#integraciones"
+        - img "Partners de TiendaNube — sumá el ecosistema" [ref=e59]
+      - link "Cobro Simple del POS Enlaces Chaco" [ref=e60] [cursor=pointer]:
+        - /url: "#funcionalidades"
+        - img "Cobro Simple del POS Enlaces Chaco" [ref=e61]
+      - link "POS Enlaces Chaco - Configuración Mercado Pago" [ref=e62] [cursor=pointer]:
+        - /url: "#integraciones"
+        - img "POS Enlaces Chaco - Configuración Mercado Pago" [ref=e63]
+      - link "POS Enlaces Chaco - Sincronización TiendaNube" [ref=e64] [cursor=pointer]:
+        - /url: "#integraciones"
+        - img "POS Enlaces Chaco - Sincronización TiendaNube" [ref=e65]
+      - link "POS Enlaces Chaco - Detalle de cierre de caja" [ref=e66] [cursor=pointer]:
+        - /url: "#funcionalidades"
+        - img "POS Enlaces Chaco - Detalle de cierre de caja" [ref=e67]
+      - link "POS Enlaces Chaco - Control total de tu negocio" [ref=e68] [cursor=pointer]:
+        - /url: "#funcionalidades"
+        - img "POS Enlaces Chaco - Control total de tu negocio" [ref=e69]
+      - link "POS Enlaces Chaco - Software de ventas" [ref=e70] [cursor=pointer]:
+        - /url: "#funcionalidades"
+        - img "POS Enlaces Chaco - Software de ventas" [ref=e71]
+      - link [ref=e72] [cursor=pointer]:
+        - /url: https://canciones.enlaceschaco.ar/#/canciones/landing
+        - generic [ref=e73]:
+          - generic [ref=e74]: 
+          - text: NUEVO
+      - link [ref=e75] [cursor=pointer]:
+        - /url: https://wa.me/543624782201?text=Hola!%20Me%20interesa%20el%20m%C3%B3dulo%20de%20Redes%20Sociales%20con%20IA
+      - link [ref=e76] [cursor=pointer]:
+        - /url: "#integraciones"
+      - link [ref=e77] [cursor=pointer]:
+        - /url: "#funcionalidades"
+      - link [ref=e78] [cursor=pointer]:
+        - /url: "#integraciones"
+      - link [ref=e79] [cursor=pointer]:
+        - /url: "#integraciones"
+      - link [ref=e80] [cursor=pointer]:
+        - /url: "#funcionalidades"
+      - link [ref=e81] [cursor=pointer]:
+        - /url: "#funcionalidades"
+      - link [ref=e82] [cursor=pointer]:
+        - /url: "#funcionalidades"
+  - navigation [ref=e83]:
+    - generic [ref=e85]:
+      - generic [ref=e86]:
+        - img "Enlaces Chaco" [ref=e87]
+        - generic [ref=e88]: Enlaces Chaco
+      - generic [ref=e89]:
+        - link "Inicio" [ref=e90] [cursor=pointer]:
+          - /url: "#hero"
+        - link "El Sistema" [ref=e91] [cursor=pointer]:
+          - /url: "#capturas"
+        - link "Funcionalidades" [ref=e92] [cursor=pointer]:
+          - /url: "#funcionalidades"
+        - link "Módulos" [ref=e93] [cursor=pointer]:
+          - /url: "#modulos"
+        - link "Integraciones" [ref=e94] [cursor=pointer]:
+          - /url: "#integraciones"
+        - link "Precios" [ref=e95] [cursor=pointer]:
+          - /url: "#precios"
+        - link "Contacto" [ref=e96] [cursor=pointer]:
+          - /url: "#contacto"
+        - link " Centro de Ayuda" [ref=e97] [cursor=pointer]:
+          - /url: /centro-ayuda
+          - generic [ref=e98]: 
+          - text: Centro de Ayuda
+      - link " Demo Gratis" [ref=e100] [cursor=pointer]:
+        - /url: https://wa.me/543624782201?text=Hola!%20Quiero%20una%20demo%20del%20POS
+        - generic [ref=e101]: 
+        - text: Demo Gratis
+  - generic [ref=e103]:
+    - generic [ref=e104]:
+      - heading "El sistema de gestión que tu negocio necesita" [level=2] [ref=e105]
+      - paragraph [ref=e106]: Vendé, facturá, controlá tu stock y gestioná tu caja desde cualquier dispositivo. Todo en un solo lugar.
+    - generic [ref=e107]:
+      - generic [ref=e108]:
+        - generic [ref=e110]: 
+        - heading "Rápido y Simple" [level=3] [ref=e111]
+        - paragraph [ref=e112]: Interfaz intuitiva que cualquier empleado puede usar desde el primer día. Sin capacitación larga.
+      - generic [ref=e113]:
+        - generic [ref=e115]: 
+        - heading "100% en la Nube" [level=3] [ref=e116]
+        - paragraph [ref=e117]: Accedé desde cualquier navegador, celular o tablet. Sin instalar nada. Tus datos siempre seguros.
+      - generic [ref=e118]:
+        - generic [ref=e120]: 
+        - heading "Funciona Offline" [level=3] [ref=e121]
+        - paragraph [ref=e122]: ¿Sin internet? Seguí vendiendo. El sistema sincroniza automáticamente cuando vuelve la conexión.
+  - generic [ref=e124]:
+    - generic [ref=e125]:
+      - heading "Mirá el sistema en acción" [level=2] [ref=e126]
+      - paragraph [ref=e127]: Capturas reales de Enlaces Chaco POS. Así se ve cada módulo por dentro.
+    - generic [ref=e128]:
+      - generic [ref=e129]:
+        - generic [ref=e130]:
+          - img "Dashboard - Panel principal con métricas del negocio"
+        - generic [ref=e131]:
+          - heading " Dashboard Principal" [level=3] [ref=e132]:
+            - generic [ref=e133]: 
+            - text: Dashboard Principal
+          - paragraph [ref=e134]: "Vista general de tu negocio en tiempo real: ventas del día, ingresos y egresos de caja, saldo actual, ganancia, clientes, productos y operaciones pendientes. Accesos directos a Nueva Venta, Gestionar Caja, Estadísticas y más. Incluye estado del sistema en tiempo real."
+      - generic [ref=e135]:
+        - generic [ref=e136]:
+          - img "Gestión de Ventas - Historial de transacciones"
+        - generic [ref=e137]:
+          - heading " Gestión de Ventas" [level=3] [ref=e138]:
+            - generic [ref=e139]: 
+            - text: Gestión de Ventas
+          - paragraph [ref=e140]: Historial completo de ventas con número de comprobante, cliente, almacén, monto total y fecha. Generá facturas electrónicas ARCA, exportá a PDF o enviá por email con un clic.
+      - generic [ref=e141]:
+        - generic [ref=e142]:
+          - img "Catálogo de Productos - Inventario completo"
+        - generic [ref=e143]:
+          - heading " Catálogo de Productos" [level=3] [ref=e144]:
+            - generic [ref=e145]: 
+            - text: Catálogo de Productos
+          - paragraph [ref=e146]: "Gestión completa de tu inventario: código de barras, nombre, categoría, stock mínimo y máximo, precio de venta y estado. Importá productos masivamente desde Excel."
+      - generic [ref=e147]:
+        - generic [ref=e148]:
+          - img "Dashboard de Caja - Control financiero completo"
+        - generic [ref=e149]:
+          - heading " Dashboard de Caja" [level=3] [ref=e150]:
+            - generic [ref=e151]: 
+            - text: Dashboard de Caja
+          - paragraph [ref=e152]: "Control total de tu caja: ingresos, egresos, saldo actual, efectivo físico y ganancia. Abrí y cerrá turnos, registrá movimientos y consultá el historial completo por fecha."
+      - generic [ref=e153]:
+        - generic [ref=e154]:
+          - img "Gestión de Clientes - Base de datos de clientes"
+        - generic [ref=e155]:
+          - heading " Gestión de Clientes" [level=3] [ref=e156]:
+            - generic [ref=e157]: 
+            - text: Gestión de Clientes
+          - paragraph [ref=e158]: Base de datos de clientes con nombre, email, tipo y número de documento, dirección, teléfono y cuenta corriente. Filtrá por activos/inactivos y exportá a Excel.
+      - generic [ref=e159]:
+        - generic [ref=e160]:
+          - img "Estadísticas y Tableros - Analytics del negocio"
+        - generic [ref=e161]:
+          - heading " Estadísticas y Tableros" [level=3] [ref=e162]:
+            - generic [ref=e163]: 
+            - text: Estadísticas y Tableros
+          - paragraph [ref=e164]: Dashboards con KPIs de tu negocio, cotizaciones de monedas en tiempo real (USD, EUR, BRL y más). Conectá con Superset para reportes avanzados, exportá a CSV o imagen.
+      - generic [ref=e165]:
+        - generic [ref=e166]:
+          - img "Gestión de Almacenes - Multi-sucursal"
+        - generic [ref=e167]:
+          - heading " Almacenes y Sucursales" [level=3] [ref=e168]:
+            - generic [ref=e169]: 
+            - text: Almacenes y Sucursales
+          - paragraph [ref=e170]: Gestioná múltiples sucursales y almacenes desde un solo lugar. Cada uno con stock, cajas y usuarios independientes. Agregá nuevas ubicaciones en segundos.
+      - generic [ref=e171]:
+        - generic [ref=e172]:
+          - img "Gestión de Proveedores"
+        - generic [ref=e173]:
+          - heading " Gestión de Proveedores" [level=3] [ref=e174]:
+            - generic [ref=e175]: 
+            - text: Gestión de Proveedores
+          - paragraph [ref=e176]: "Registrá tus proveedores con datos completos: nombre, email, documento, dirección y teléfono. Gestioná compras y actualizá stock automáticamente al recibir mercadería."
+      - generic [ref=e177]:
+        - generic [ref=e178]:
+          - img "Cobro Simple - Facturación rápida"
+        - generic [ref=e179]:
+          - heading " Cobro Simple (Factura Fácil)" [level=3] [ref=e180]:
+            - generic [ref=e181]: 
+            - text: Cobro Simple (Factura Fácil)
+          - paragraph [ref=e182]: "Pantalla simplificada para cobros rápidos: seleccioná cliente, tipo de comprobante (Recibo X, Factura A/B/C), buscá el producto por nombre o código y facturá con un solo clic. Ideal para alto volumen de ventas."
+      - generic [ref=e183]:
+        - generic [ref=e184]:
+          - img "Gestión de Categorías de productos"
+        - generic [ref=e185]:
+          - heading " Categorías de Productos" [level=3] [ref=e186]:
+            - generic [ref=e187]: 
+            - text: Categorías de Productos
+          - paragraph [ref=e188]: "Organizá tu catálogo en categorías personalizadas: Golosinas, Galletitas, Infusiones, Almacén, Bebidas y las que necesites. Activá o desactivá categorías según temporada."
+      - generic [ref=e189]:
+        - generic [ref=e190]:
+          - img "Importar productos desde Excel"
+        - generic [ref=e191]:
+          - heading " Importación Masiva desde Excel" [level=3] [ref=e192]:
+            - generic [ref=e193]: 
+            - text: Importación Masiva desde Excel
+          - paragraph [ref=e194]: "Cargá cientos de productos en segundos. Tres modos: Crear/Actualizar productos, Editar directamente en pantalla, o Importar desde archivo Excel (.xlsx, .xls). Seleccioná el almacén destino y listo."
+      - generic [ref=e195]:
+        - generic [ref=e196]:
+          - img "Gestión de Presupuestos"
+        - generic [ref=e197]:
+          - heading " Presupuestos" [level=3] [ref=e198]:
+            - generic [ref=e199]: 
+            - text: Presupuestos
+          - paragraph [ref=e200]: Creá presupuestos sin afectar el stock. Cuando el cliente confirma, convertilo a venta con un clic y el stock se descuenta automáticamente. Filtrá por activos o archivados.
+      - generic [ref=e201]:
+        - generic [ref=e202]:
+          - img "Gestión de Compras a proveedores"
+        - generic [ref=e203]:
+          - heading " Proceso de Compras" [level=3] [ref=e204]:
+            - generic [ref=e205]: 
+            - text: Proceso de Compras
+          - paragraph [ref=e206]: Registrá compras a proveedores con detalle por producto. Al confirmar la compra, el stock se actualiza automáticamente en el almacén seleccionado. Buscá por proveedor y filtrá por fecha.
+      - generic [ref=e207]:
+        - generic [ref=e208]:
+          - img "Integración con TiendaNube"
+        - generic [ref=e209]:
+          - heading " Integración TiendaNube" [level=3] [ref=e210]:
+            - generic [ref=e211]: 
+            - text: Integración TiendaNube
+          - paragraph [ref=e212]: Conectá tu tienda online en minutos. Configurá Store ID, Client ID y Secret. Los webhooks sincronizan stock automáticamente cuando vendés online o en el local. Todo en tiempo real.
+      - generic [ref=e213]:
+        - generic [ref=e214]:
+          - img "Configuración de Mercado Pago"
+        - generic [ref=e215]:
+          - heading " Mercado Pago" [level=3] [ref=e216]:
+            - generic [ref=e217]: 
+            - text: Mercado Pago
+          - paragraph [ref=e218]: Activá pagos con QR en tu local y checkout online. Configurá tu Access Token y Public Key desde el panel de Mercado Pago. Probá la conexión antes de activar y empezá a cobrar con todas las tarjetas.
+  - generic [ref=e220]:
+    - generic [ref=e221]:
+      - heading "Todo lo que necesitás para vender más" [level=2] [ref=e222]
+      - paragraph [ref=e223]: Más de 100 funcionalidades diseñadas para comercios, kioscos, supermercados y mucho más
+    - generic [ref=e224]:
+      - generic [ref=e225]:
+        - generic [ref=e227]: 
+        - heading "Ventas y Facturación" [level=3] [ref=e228]
+        - paragraph [ref=e229]: Proceso de venta completo con múltiples formas de pago, presupuestos, descuentos y comprobantes en PDF.
+        - list [ref=e230]:
+          - listitem [ref=e231]:
+            - generic [ref=e232]: 
+            - text: Cobro rápido con búsqueda inteligente
+          - listitem [ref=e233]:
+            - generic [ref=e234]: 
+            - text: Presupuestos convertibles a venta
+          - listitem [ref=e235]:
+            - generic [ref=e236]: 
+            - text: Múltiples formas de pago por venta
+          - listitem [ref=e237]:
+            - generic [ref=e238]: 
+            - text: Ticket térmico y factura A4 en PDF
+          - listitem [ref=e239]:
+            - generic [ref=e240]: 
+            - text: Envío de comprobantes por email
+          - listitem [ref=e241]:
+            - generic [ref=e242]: 
+            - text: Exportación a Excel
+      - generic [ref=e243]:
+        - generic [ref=e245]: 
+        - heading "Inventario y Stock" [level=3] [ref=e246]
+        - paragraph [ref=e247]: Control total de tus productos con múltiples almacenes, categorías y actualización masiva.
+        - list [ref=e248]:
+          - listitem [ref=e249]:
+            - generic [ref=e250]: 
+            - text: Gestión de productos por categoría
+          - listitem [ref=e251]:
+            - generic [ref=e252]: 
+            - text: Múltiples almacenes y sucursales
+          - listitem [ref=e253]:
+            - generic [ref=e254]: 
+            - text: Listas de precios personalizadas
+          - listitem [ref=e255]:
+            - generic [ref=e256]: 
+            - text: Importación masiva desde Excel
+          - listitem [ref=e257]:
+            - generic [ref=e258]: 
+            - text: Actualización de precios en lote
+          - listitem [ref=e259]:
+            - generic [ref=e260]: 
+            - text: Unidades de medida configurables
+      - generic [ref=e261]:
+        - generic [ref=e263]: 
+        - heading "Caja y Finanzas" [level=3] [ref=e264]
+        - paragraph [ref=e265]: Apertura, cierre y movimientos de caja con conteo de efectivo y conciliación automática.
+        - list [ref=e266]:
+          - listitem [ref=e267]:
+            - generic [ref=e268]: 
+            - text: Apertura y cierre de caja por turno
+          - listitem [ref=e269]:
+            - generic [ref=e270]: 
+            - text: Movimientos de ingreso y egreso
+          - listitem [ref=e271]:
+            - generic [ref=e272]: 
+            - text: Conteo de efectivo en tiempo real
+          - listitem [ref=e273]:
+            - generic [ref=e274]: 
+            - text: Reporte de cierre con conciliación
+          - listitem [ref=e275]:
+            - generic [ref=e276]: 
+            - text: Historial completo por sucursal
+          - listitem [ref=e277]:
+            - generic [ref=e278]: 
+            - text: Validación automática de cierres
+      - generic [ref=e279]:
+        - generic [ref=e281]: 
+        - heading "Clientes y Proveedores" [level=3] [ref=e282]
+        - paragraph [ref=e283]: Gestioná tu cartera de clientes con datos comerciales y llevá el control de tus proveedores y compras.
+        - list [ref=e284]:
+          - listitem [ref=e285]:
+            - generic [ref=e286]: 
+            - text: Ficha completa de clientes
+          - listitem [ref=e287]:
+            - generic [ref=e288]: 
+            - text: Cuentas corrientes por cliente
+          - listitem [ref=e289]:
+            - generic [ref=e290]: 
+            - text: Gestión de proveedores
+          - listitem [ref=e291]:
+            - generic [ref=e292]: 
+            - text: Registro de compras con stock
+          - listitem [ref=e293]:
+            - generic [ref=e294]: 
+            - text: Exportación de datos a Excel
+          - listitem [ref=e295]:
+            - generic [ref=e296]: 
+            - text: Onboarding guiado para nuevos clientes
+  - generic [ref=e298]:
+    - generic [ref=e299]:
+      - heading "Todo lo que incluye" [level=2] [ref=e300]
+      - paragraph [ref=e301]: Más de 20 módulos profesionales para gestionar cada área de tu negocio. Activá solo los que necesités.
+    - generic [ref=e302]:
+      - generic [ref=e303]:
+        - generic [ref=e304]:
+          - generic [ref=e306]: 
+          - heading "Ventas y Atención" [level=3] [ref=e307]
+        - generic [ref=e308]:
+          - generic [ref=e309]:
+            - generic [ref=e310]: 
+            - generic [ref=e311]:
+              - strong [ref=e312]: Ventas
+              - paragraph [ref=e313]: Registrá ventas en segundos con múltiples formas de pago. Crédito, débito, QR, efectivo y cuenta corriente.
+          - generic [ref=e314]:
+            - generic [ref=e315]: 
+            - generic [ref=e316]:
+              - strong [ref=e317]: Clientes
+              - paragraph [ref=e318]: Ficha completa con historial de compras, saldos pendientes y acceso directo a la cuenta corriente.
+          - generic [ref=e319]:
+            - generic [ref=e320]: 
+            - generic [ref=e321]:
+              - strong [ref=e322]: Cobro Simple
+              - paragraph [ref=e323]: Pantalla ultrarrápida para cobrar sin registrar la venta completa. Ideal para alto volumen.
+          - generic [ref=e324]:
+            - generic [ref=e325]: 
+            - generic [ref=e326]:
+              - strong [ref=e327]: Cuenta Corriente
+              - paragraph [ref=e328]: Gestioná saldos a favor y deudas de cada cliente con control total y vencimientos automáticos.
+      - generic [ref=e329]:
+        - generic [ref=e330]:
+          - generic [ref=e332]: 
+          - heading "Productos y Stock" [level=3] [ref=e333]
+        - generic [ref=e334]:
+          - generic [ref=e335]:
+            - generic [ref=e336]: 
+            - generic [ref=e337]:
+              - strong [ref=e338]: Productos
+              - paragraph [ref=e339]: Catálogo completo con stock en tiempo real, código de barras y precios variables por almacén.
+          - generic [ref=e340]:
+            - generic [ref=e341]: 
+            - generic [ref=e342]:
+              - strong [ref=e343]: Categorías
+              - paragraph [ref=e344]: Organizá tus productos de forma jerárquica para filtrarlos y encontrarlos al instante.
+          - generic [ref=e345]:
+            - generic [ref=e346]: 
+            - generic [ref=e347]:
+              - strong [ref=e348]: Almacenes
+              - paragraph [ref=e349]: Múltiples depósitos con stock independiente. Transferí mercadería entre sucursales sin complicaciones.
+          - generic [ref=e350]:
+            - generic [ref=e351]: 
+            - generic [ref=e352]:
+              - strong [ref=e353]: Combos
+              - paragraph [ref=e354]: "Agrupá productos en packs con precio especial. Ej: \"Combo limpieza\", \"Pack ahorro\"."
+          - generic [ref=e355]:
+            - generic [ref=e356]: 
+            - generic [ref=e357]:
+              - strong [ref=e358]: Importación
+              - paragraph [ref=e359]: Cargá cientos de productos desde Excel en segundos. Sin tipear uno por uno.
+      - generic [ref=e360]:
+        - generic [ref=e361]:
+          - generic [ref=e363]: 
+          - heading "Caja y Finanzas" [level=3] [ref=e364]
+        - generic [ref=e365]:
+          - generic [ref=e366]:
+            - generic [ref=e367]: 
+            - generic [ref=e368]:
+              - strong [ref=e369]: Caja
+              - paragraph [ref=e370]: Apertura y cierre de caja con arqueo diario, conteo de efectivo y desglose por forma de pago.
+          - generic [ref=e371]:
+            - generic [ref=e372]: 
+            - generic [ref=e373]:
+              - strong [ref=e374]: Gastos Mensuales
+              - paragraph [ref=e375]: Registrá gastos fijos como alquiler, servicios y sueldos. Balance mensual automático.
+          - generic [ref=e376]:
+            - generic [ref=e377]: 
+            - generic [ref=e378]:
+              - strong [ref=e379]: Servicios Mensuales
+              - paragraph [ref=e380]: Gestioná suscripciones y servicios recurrentes con vencimientos programados.
+          - generic [ref=e381]:
+            - generic [ref=e382]: 
+            - generic [ref=e383]:
+              - strong [ref=e384]: Listas de Precios
+              - paragraph [ref=e385]: Precios diferenciales por cliente, canal o lista. Mayorista, minorista y el que necesités.
+      - generic [ref=e386]:
+        - generic [ref=e387]:
+          - generic [ref=e389]: 
+          - heading "Proveedores y Compras" [level=3] [ref=e390]
+        - generic [ref=e391]:
+          - generic [ref=e392]:
+            - generic [ref=e393]: 
+            - generic [ref=e394]:
+              - strong [ref=e395]: Proveedores
+              - paragraph [ref=e396]: Registrá tus proveedores con datos de contacto y productos que te proveen. Todo en un solo lugar.
+          - generic [ref=e397]:
+            - generic [ref=e398]: 
+            - generic [ref=e399]:
+              - strong [ref=e400]: Compras
+              - paragraph [ref=e401]: Registrá compras a proveedores y el stock se actualiza automáticamente al recibir mercadería.
+      - generic [ref=e402]:
+        - generic [ref=e403]:
+          - generic [ref=e405]: 
+          - heading "Facturación y Legal" [level=3] [ref=e406]
+        - generic [ref=e407]:
+          - generic [ref=e408]:
+            - generic [ref=e409]: 
+            - generic [ref=e410]:
+              - strong [ref=e411]: Facturación ARCA
+              - paragraph [ref=e412]: Emití facturas electrónicas A, B y C directo a AFIP/ARCA. Con QR, CAE automático y retenciones.
+          - generic [ref=e413]:
+            - generic [ref=e414]: 
+            - generic [ref=e415]:
+              - strong [ref=e416]: Certificados AFIP
+              - paragraph [ref=e417]: Administrá tus certificados digitales desde el panel web. Sin abrir el aplicativo ARCA.
+      - generic [ref=e418]:
+        - generic [ref=e419]:
+          - generic [ref=e421]: 
+          - heading "Integraciones" [level=3] [ref=e422]
+        - generic [ref=e423]:
+          - generic [ref=e424]:
+            - generic [ref=e425]: 
+            - generic [ref=e426]:
+              - strong [ref=e427]: Tienda Nube
+              - paragraph [ref=e428]: Sincronización bidireccional de stock, productos, ventas y clientes con tu tienda online. Conexión segura via OAuth con webhooks en tiempo real. Todo unificado automáticamente.
+          - generic [ref=e430]:
+            - strong [ref=e431]: Modo Offline
+            - paragraph [ref=e432]: Seguí vendiendo sin internet. Los datos se guardan localmente y sincronizan al reconectar.
+          - generic [ref=e433]:
+            - generic [ref=e434]: 
+            - generic [ref=e435]:
+              - strong [ref=e436]: Service Token Generator
+              - paragraph [ref=e437]: Generá tokens de acceso seguros con permisos limitados para integrar sistemas externos sin exponer tu cuenta principal.
+      - generic [ref=e438]:
+        - generic [ref=e439]:
+          - generic [ref=e441]: 
+          - heading "Administración" [level=3] [ref=e442]
+        - generic [ref=e443]:
+          - generic [ref=e444]:
+            - generic [ref=e445]: 
+            - generic [ref=e446]:
+              - strong [ref=e447]: Dashboard
+              - paragraph [ref=e448]: "Panel principal con métricas en tiempo real: ventas, ingresos, ganancia, clientes y productos."
+          - generic [ref=e449]:
+            - generic [ref=e450]: 
+            - generic [ref=e451]:
+              - strong [ref=e452]: Roles y Permisos
+              - paragraph [ref=e453]: Controlá qué puede ver y hacer cada empleado. Admin, vendedor, cajero, solo consulta.
+          - generic [ref=e454]:
+            - generic [ref=e455]: 
+            - generic [ref=e456]:
+              - strong [ref=e457]: Notificaciones
+              - paragraph [ref=e458]: Alertas en tiempo real de stock bajo, nuevas ventas y cierres de caja pendientes.
+          - generic [ref=e459]:
+            - generic [ref=e460]: 
+            - generic [ref=e461]:
+              - strong [ref=e462]: Respaldos
+              - paragraph [ref=e463]: Backup de tu base de datos con un clic. Descargalo y mantené tus datos siempre seguros.
+          - generic [ref=e464]:
+            - generic [ref=e465]: 
+            - generic [ref=e466]:
+              - strong [ref=e467]: Cliente Onboarding
+              - paragraph [ref=e468]: "Guía al dueño paso a paso para dar de alta su negocio: registra empresa, crea usuarios, configura datos fiscales. Listo en minutos sin soporte técnico."
+  - generic [ref=e471]:
+    - generic [ref=e472]:
+      - generic [ref=e473]:
+        - generic [ref=e474]: 
+        - text: Cumplí con AFIP
+      - heading "Facturación Electrónica ARCA" [level=2] [ref=e475]
+      - paragraph [ref=e476]: Emití facturas electrónicas A, B y C directamente desde el sistema. 100% integrado con ARCA/AFIP, con QR de verificación incluido en cada comprobante.
+      - generic [ref=e477]:
+        - generic [ref=e478]:
+          - generic [ref=e479]: 
+          - generic [ref=e480]: Factura A, B y C electrónica
+        - generic [ref=e481]:
+          - generic [ref=e482]: 
+          - generic [ref=e483]: QR AFIP en cada comprobante
+        - generic [ref=e484]:
+          - generic [ref=e485]: 
+          - generic [ref=e486]: Configuración de certificados digital
+        - generic [ref=e487]:
+          - generic [ref=e488]: 
+          - generic [ref=e489]: Historial completo de compras
+      - link " Solicitar Demo" [ref=e491] [cursor=pointer]:
+        - /url: https://wa.me/543624782201?text=Hola!%20Me%20interesa%20la%20facturación%20electrónica%20ARCA
+        - generic [ref=e492]: 
+        - text: Solicitar Demo
+    - generic [ref=e494]:
+      - generic [ref=e495]:
+        - generic [ref=e497]: 
+        - generic [ref=e498]:
+          - heading "Factura Electrónica" [level=4] [ref=e499]
+          - text: ARCA Habilitado
+      - generic [ref=e500]:
+        - generic [ref=e501]:
+          - paragraph [ref=e502]:
+            - strong [ref=e503]: Factura B - 0001-00000142
+          - paragraph [ref=e504]:
+            - text: "Cliente: Consumidor Final"
+            - text: "Total: $45.500,00"
+            - text: "IVA 21%: $7.903,10"
+          - paragraph [ref=e505]:
+            - generic [ref=e506]: 
+            - text: "CAE: 74123456789012"
+        - paragraph [ref=e508]:
+          - generic [ref=e509]: 
+          - text: Factura emitida correctamente
+        - generic [ref=e511]:
+          - button " Imprimir" [ref=e512] [cursor=pointer]:
+            - generic [ref=e513]: 
+            - text: Imprimir
+          - button " Enviar PDF" [ref=e514] [cursor=pointer]:
+            - generic [ref=e515]: 
+            - text: Enviar PDF
+          - button " Descargar" [ref=e516] [cursor=pointer]:
+            - generic [ref=e517]: 
+            - text: Descargar
+  - generic [ref=e519]:
+    - generic [ref=e520]:
+      - heading "Un sistema, múltiples negocios" [level=2] [ref=e521]
+      - paragraph [ref=e522]: Módulos especializados para cada rubro. Activá solo los que necesitás.
+    - generic [ref=e523]:
+      - generic [ref=e524]:
+        - generic [ref=e526]: 
+        - heading "Restaurantes y Bares" [level=3] [ref=e527]
+        - paragraph [ref=e528]: Mapa de mesas, pedidos a cocina, delivery, menú QR y caja independiente.
+      - generic [ref=e529]:
+        - generic [ref=e531]: 
+        - heading "Gimnasios" [level=3] [ref=e532]
+        - paragraph [ref=e533]: Socios, membresías, check-in, rutinas, clases grupales y seguimiento de progreso.
+      - generic [ref=e534]:
+        - generic [ref=e536]: 
+        - heading "Consultorios Médicos" [level=3] [ref=e537]
+        - paragraph [ref=e538]: Pacientes, citas, recetas electrónicas, consultas, laboratorio e imágenes.
+      - generic [ref=e539]:
+        - generic [ref=e541]: 
+        - heading "Estética y Spa" [level=3] [ref=e542]
+        - paragraph [ref=e543]: Insumos, comisiones por profesional, reservas, descuentos y agenda de turnos.
+      - generic [ref=e544]:
+        - generic [ref=e546]: 
+        - heading "Talleres de Reparación" [level=3] [ref=e547]
+        - paragraph [ref=e548]: Recepción de equipos, presupuestos, seguimiento de trabajos y entrega.
+      - generic [ref=e549]:
+        - generic [ref=e551]: 
+        - heading "Sistema de Turnos" [level=3] [ref=e552]
+        - paragraph [ref=e553]: Agenda online, servicios configurables, confirmación automática y recordatorios.
+      - generic [ref=e554]:
+        - generic [ref=e556]: 
+        - heading "Eventos" [level=3] [ref=e557]
+        - paragraph [ref=e558]: Venta de entradas, control de acceso, gestión de eventos y reportes.
+      - generic [ref=e559]:
+        - generic [ref=e561]: 
+        - heading "Carrito de Compras Online" [level=3] [ref=e562]
+        - paragraph [ref=e563]: E-commerce propio con catálogo de productos, checkout y pago con Mercado Pago.
+      - generic [ref=e564]:
+        - generic [ref=e566]: 
+        - heading "Contratistas" [level=3] [ref=e567]
+        - paragraph [ref=e568]: Gestión de proyectos, asignación de contratistas y seguimiento de obras.
+  - generic [ref=e570]:
+    - generic [ref=e571]:
+      - heading "Se integra con lo que ya usás" [level=2] [ref=e572]
+      - paragraph [ref=e573]: Conectá tu POS con las plataformas más importantes de Argentina
+    - generic [ref=e574]:
+      - generic [ref=e575]:
+        - generic [ref=e577]: 
+        - heading "TiendaNube" [level=3] [ref=e578]
+        - paragraph [ref=e579]: Sincronización bidireccional de productos, precios y stock. Recibí pedidos online automáticamente en tu POS.
+        - list [ref=e580]:
+          - listitem [ref=e581]:
+            - generic [ref=e582]: 
+            - text: Sincronización automática de catálogo
+          - listitem [ref=e583]:
+            - generic [ref=e584]: 
+            - text: Stock sincronizado en tiempo real
+          - listitem [ref=e585]:
+            - generic [ref=e586]: 
+            - text: Pedidos online directo al POS
+          - listitem [ref=e587]:
+            - generic [ref=e588]: 
+            - text: Webhooks para notificaciones
+      - generic [ref=e589]:
+        - generic [ref=e591]: 
+        - heading "Mercado Pago" [level=3] [ref=e592]
+        - paragraph [ref=e593]: Cobrá con QR y recibí pagos desde tu e-commerce integrado directamente en el sistema.
+        - list [ref=e594]:
+          - listitem [ref=e595]:
+            - generic [ref=e596]: 
+            - text: Cobro con QR en el local
+          - listitem [ref=e597]:
+            - generic [ref=e598]: 
+            - text: Checkout online integrado
+          - listitem [ref=e599]:
+            - generic [ref=e600]: 
+            - text: Conciliación automática
+          - listitem [ref=e601]:
+            - generic [ref=e602]: 
+            - text: Todas las tarjetas y medios
+      - generic [ref=e603]:
+        - generic [ref=e605]: 
+        - heading "Reportes y Estadísticas" [level=3] [ref=e606]
+        - paragraph [ref=e607]: Dashboards con KPIs, ventas por período, rendimiento por sucursal y exportación a PDF/Excel.
+        - list [ref=e608]:
+          - listitem [ref=e609]:
+            - generic [ref=e610]: 
+            - text: Dashboard con métricas clave
+          - listitem [ref=e611]:
+            - generic [ref=e612]: 
+            - text: Filtros por fecha y sucursal
+          - listitem [ref=e613]:
+            - generic [ref=e614]: 
+            - text: Exportación a PDF y Excel
+          - listitem [ref=e615]:
+            - generic [ref=e616]: 
+            - text: Cotizaciones de monedas en tiempo real
+  - generic [ref=e618]:
+    - generic [ref=e619]:
+      - heading "¿Por qué elegir Enlaces Chaco POS?" [level=2] [ref=e620]
+      - paragraph [ref=e621]: Ventajas que nos diferencian de la competencia
+    - generic [ref=e622]:
+      - generic [ref=e623]:
+        - generic [ref=e625]: 
+        - heading "Modo Offline" [level=3] [ref=e626]
+        - paragraph [ref=e627]: Seguí vendiendo durante cortes de internet. Productos, clientes y ventas se guardan localmente y se sincronizan automáticamente al restablecerse la conexión.
+      - generic [ref=e628]:
+        - generic [ref=e630]: 
+        - heading "Multi-Sucursal" [level=3] [ref=e631]
+        - paragraph [ref=e632]: Gestioná varias sucursales desde un solo lugar. Stock, cajas y usuarios independientes por ubicación.
+      - generic [ref=e633]:
+        - generic [ref=e635]: 
+        - heading "Roles y Permisos" [level=3] [ref=e636]
+        - paragraph [ref=e637]: Creá roles personalizados y asigná permisos por módulo. Cada empleado ve solo lo que necesita.
+      - generic [ref=e638]:
+        - generic [ref=e640]: 
+        - heading "Notificaciones" [level=3] [ref=e641]
+        - paragraph [ref=e642]: Alertas de stock bajo, pagos vencidos y pedidos nuevos. Por la app y por Telegram.
+      - generic [ref=e643]:
+        - generic [ref=e645]: 
+        - heading "Backup Automático" [level=3] [ref=e646]
+        - paragraph [ref=e647]: Respaldo de tu base de datos desde la interfaz. Descargá y restaurá cuando lo necesites.
+      - generic [ref=e648]:
+        - generic [ref=e650]: 
+        - heading "Soporte Local" [level=3] [ref=e651]
+        - paragraph [ref=e652]: Atención directa desde Resistencia, Chaco. Conocemos tu mercado y hablamos tu idioma.
+  - generic [ref=e654]:
+    - generic [ref=e655]:
+      - heading "Planes para cada negocio" [level=2] [ref=e656]
+      - paragraph [ref=e657]: Elegí el plan que se adapte a tu tamaño. Todos incluyen soporte y actualizaciones.
+    - generic [ref=e658]:
+      - generic [ref=e659]: 
+      - text: 7 días de prueba GRATIS
+    - generic [ref=e660]:
+      - generic [ref=e661]:
+        - generic [ref=e662]:
+          - heading "Emprendedor" [level=3] [ref=e663]
+          - generic [ref=e664]:
+            - generic [ref=e665]: $
+            - generic [ref=e666]: "15.000"
+            - generic [ref=e667]: /mes
+        - list [ref=e668]:
+          - listitem [ref=e669]:
+            - generic [ref=e670]: 
+            - text: Ventas y facturación
+          - listitem [ref=e671]:
+            - generic [ref=e672]: 
+            - text: Control de stock básico
+          - listitem [ref=e673]:
+            - generic [ref=e674]: 
+            - text: Caja con apertura/cierre
+          - listitem [ref=e675]:
+            - generic [ref=e676]: 
+            - text: 1 usuario
+          - listitem [ref=e677]:
+            - generic [ref=e678]: 
+            - text: Soporte por WhatsApp
+        - link "Empezar Gratis" [ref=e679] [cursor=pointer]:
+          - /url: https://wa.me/543624782201?text=Hola!%20Me%20interesa%20el%20plan%20Emprendedor
+      - generic [ref=e680]:
+        - generic [ref=e681]: Más Popular
+        - generic [ref=e682]:
+          - heading "Comercio" [level=3] [ref=e683]
+          - generic [ref=e684]:
+            - generic [ref=e685]: $
+            - generic [ref=e686]: "35.000"
+            - generic [ref=e687]: /mes
+        - list [ref=e688]:
+          - listitem [ref=e689]:
+            - generic [ref=e690]: 
+            - text: Todo del plan Emprendedor
+          - listitem [ref=e691]:
+            - generic [ref=e692]: 
+            - text: Factura electrónica ARCA
+          - listitem [ref=e693]:
+            - generic [ref=e694]: 
+            - text: Múltiples formas de pago
+          - listitem [ref=e695]:
+            - generic [ref=e696]: 
+            - text: Clientes y proveedores
+          - listitem [ref=e697]:
+            - generic [ref=e698]: 
+            - text: Hasta 5 usuarios
+          - listitem [ref=e699]:
+            - generic [ref=e700]: 
+            - text: Respaldo local ante cortes
+        - link "Empezar Gratis" [ref=e701] [cursor=pointer]:
+          - /url: https://wa.me/543624782201?text=Hola!%20Me%20interesa%20el%20plan%20Comercio
+      - generic [ref=e702]:
+        - generic [ref=e703]:
+          - heading "Empresa" [level=3] [ref=e704]
+          - generic [ref=e705]:
+            - generic [ref=e706]: $
+            - generic [ref=e707]: "65.000"
+            - generic [ref=e708]: /mes
+        - list [ref=e709]:
+          - listitem [ref=e710]:
+            - generic [ref=e711]: 
+            - text: Todo del plan Comercio
+          - listitem [ref=e712]:
+            - generic [ref=e713]: 
+            - text: Multi-sucursal
+          - listitem [ref=e714]:
+            - generic [ref=e715]: 
+            - text: Integración TiendaNube
+          - listitem [ref=e716]:
+            - generic [ref=e717]: 
+            - text: Mercado Pago QR
+          - listitem [ref=e718]:
+            - generic [ref=e719]: 
+            - text: Usuarios ilimitados
+          - listitem [ref=e720]:
+            - generic [ref=e721]: 
+            - text: Módulos verticales
+          - listitem [ref=e722]:
+            - generic [ref=e723]: 
+            - text: Soporte prioritario
+        - link "Empezar Gratis" [ref=e724] [cursor=pointer]:
+          - /url: https://wa.me/543624782201?text=Hola!%20Me%20interesa%20el%20plan%20Empresa
+  - generic [ref=e726]:
+    - generic [ref=e727]:
+      - heading "Lo que dicen nuestros clientes" [level=2] [ref=e728]
+      - paragraph [ref=e729]: Negocios reales que ya confían en Enlaces Chaco POS
+    - generic [ref=e730]:
+      - generic [ref=e731]:
+        - generic [ref=e732]:
+          - generic [ref=e733]:
+            - generic [ref=e734]: 
+            - generic [ref=e735]: 
+            - generic [ref=e736]: 
+            - generic [ref=e737]: 
+            - generic [ref=e738]: 
+          - paragraph [ref=e739]: "\"Pasamos de anotar todo en un cuaderno a tener control total del stock y la caja. La facturación electrónica nos ahorró horas de trabajo.\""
+        - generic [ref=e741]:
+          - heading "Comercio Minorista" [level=4] [ref=e742]
+          - text: Resistencia, Chaco
+      - generic [ref=e743]:
+        - generic [ref=e744]:
+          - generic [ref=e745]:
+            - generic [ref=e746]: 
+            - generic [ref=e747]: 
+            - generic [ref=e748]: 
+            - generic [ref=e749]: 
+            - generic [ref=e750]: 
+          - paragraph [ref=e751]: "\"Sincronizamos nuestro local con TiendaNube y ahora vendemos online sin duplicar trabajo. El stock se actualiza solo.\""
+        - generic [ref=e753]:
+          - heading "Tienda de Ropa" [level=4] [ref=e754]
+          - text: Chaco, Argentina
+  - generic [ref=e756]:
+    - generic [ref=e757]:
+      - generic [ref=e758]:
+        - generic [ref=e759]:
+          - generic [ref=e760]: 
+          - text: NUEVO
+        - generic [ref=e761]: Precio de lanzamiento
+      - heading "Canciones personalizadas con IA" [level=2] [ref=e762]
+      - paragraph [ref=e763]: Convertí tus recuerdos en una canción única para esa persona especial. Elegí el género, el estado de ánimo y la voz, contá tu historia y la IA compone la letra y la música.
+    - generic [ref=e764]:
+      - generic [ref=e765]:
+        - generic [ref=e767]: 
+        - generic [ref=e768]: "1"
+        - heading "Completá los detalles" [level=3] [ref=e769]
+        - paragraph [ref=e770]: Destinatario, género musical, estado de ánimo, estilo de voz y fragmentos con tus recuerdos y dedicatorias.
+      - generic [ref=e771]:
+        - generic [ref=e773]: 
+        - generic [ref=e774]: "2"
+        - heading "Escuchá la preview" [level=3] [ref=e775]
+        - paragraph [ref=e776]: Recibís una preview gratuita de 30 segundos ANTES de pagar. Si no te convence, la rehacemos todas las veces que necesites.
+      - generic [ref=e777]:
+        - generic [ref=e779]: 
+        - generic [ref=e780]: "3"
+        - heading "Aboná y descargá" [level=3] [ref=e781]
+        - paragraph [ref=e782]: Pagás una sola vez y recibís el MP3 completo, listo para escuchar y compartir.
+    - generic [ref=e783]:
+      - figure "Pantalla de bienvenida" [ref=e784]:
+        - img "Pantalla de bienvenida de canciones personalizadas" [ref=e785]
+        - generic [ref=e786]: Pantalla de bienvenida
+      - figure "Formulario de creación" [ref=e787]:
+        - img "Formulario de creación de canciones personalizadas" [ref=e788]
+        - generic [ref=e789]: Formulario de creación
+      - figure "Generando tu canción" [ref=e790]:
+        - img "Formulario de canciones personalizadas completo" [ref=e791]
+        - generic [ref=e792]: Generando tu canción
+    - generic [ref=e793]:
+      - generic [ref=e795]: 
+      - generic [ref=e796]:
+        - heading "Escuchá antes de pagar" [level=4] [ref=e797]
+        - paragraph [ref=e798]: Cada canción incluye una preview de 30 segundos. Si la letra o el estilo no te convencen, la rehacemos hasta que quede perfecta. Vos aprobás, después pagás.
+    - generic [ref=e799]:
+      - generic [ref=e800]:
+        - generic [ref=e801]: Podés escucharnos
+        - heading "Nuestros estilos en vivo" [level=3] [ref=e802]
+        - paragraph [ref=e803]: Dale play y que arranque el boliche. Así suena lo que podemos hacer con IA, en el estilo que se te ocurra.
+      - generic [ref=e804]:
+        - generic [ref=e805]:
+          - generic [ref=e806]:
+            - generic [ref=e807]: "1"
+            - generic [ref=e808]: Cumbia Latina
+          - paragraph [ref=e809]: Ritmo bailable que no para
+        - generic [ref=e836]:
+          - generic [ref=e837]:
+            - generic [ref=e838]: "2"
+            - generic [ref=e839]: Cumbia Latina
+          - paragraph [ref=e840]: Vibra bien canchera
+        - generic [ref=e867]:
+          - generic [ref=e868]:
+            - generic [ref=e869]: "3"
+            - generic [ref=e870]: Cumbia Latina
+          - paragraph [ref=e871]: Versión más tranquila
+        - generic [ref=e898]:
+          - generic [ref=e899]:
+            - generic [ref=e900]: "4"
+            - generic [ref=e901]: Cumbia Latina
+          - paragraph [ref=e902]: Cumbia con onda
+        - generic [ref=e929]:
+          - generic [ref=e930]:
+            - generic [ref=e931]: "5"
+            - generic [ref=e932]: Cumbia Latina
+          - paragraph [ref=e933]: Corto y directo al baile
+        - generic [ref=e960]:
+          - generic [ref=e961]:
+            - generic [ref=e962]: "6"
+            - generic [ref=e963]: Romántica Latina
+          - paragraph [ref=e964]: Versión final, emotiva y a capella
+    - generic [ref=e991]:
+      - generic [ref=e992]: Precio de lanzamiento
+      - generic [ref=e993]: $15.000/canción
+      - generic [ref=e994]:
+        - link " Probar la app gratis" [ref=e995] [cursor=pointer]:
+          - /url: https://canciones.enlaceschaco.ar/#/canciones/landing
+          - generic [ref=e996]: 
+          - text: Probar la app gratis
+        - link " Consultar por WhatsApp" [ref=e997] [cursor=pointer]:
+          - /url: https://wa.me/543624782201?text=Hola!%20Quiero%20una%20canci%C3%B3n%20personalizada
+          - generic [ref=e998]: 
+          - text: Consultar por WhatsApp
+      - paragraph [ref=e999]: Cada canción es 100% personalizada y generada con IA en español.
+      - generic [ref=e1002]:
+        - generic [ref=e1003]: "17"
+        - generic [ref=e1004]: Canciones generadas
+  - generic [ref=e1006]:
+    - generic [ref=e1007]:
+      - heading "Empezá hoy mismo" [level=2] [ref=e1008]
+      - paragraph [ref=e1009]: Solicitá tu demo gratis y te mostramos cómo funciona en 15 minutos
+    - generic [ref=e1010]:
+      - generic [ref=e1011]:
+        - generic [ref=e1012]:
+          - generic [ref=e1014]: 
+          - generic [ref=e1015]:
+            - heading "Ubicación" [level=4] [ref=e1016]
+            - paragraph [ref=e1017]: Resistencia, Chaco, Argentina
+        - generic [ref=e1018]:
+          - generic [ref=e1020]: 
+          - generic [ref=e1021]:
+            - heading "WhatsApp" [level=4] [ref=e1022]
+            - paragraph [ref=e1023]: +54 362 4782201
+        - generic [ref=e1024]:
+          - generic [ref=e1026]: 
+          - generic [ref=e1027]:
+            - heading "Email" [level=4] [ref=e1028]
+            - paragraph [ref=e1029]: ivanfernandezm99@gmail.com
+        - generic [ref=e1030]:
+          - generic [ref=e1032]: 
+          - generic [ref=e1033]:
+            - heading "Horarios" [level=4] [ref=e1034]
+            - paragraph [ref=e1035]:
+              - text: "Lun-Vie: 9:00-18:00"
+              - text: "Sáb: 9:00-13:00"
+        - generic [ref=e1036]:
+          - link "" [ref=e1037] [cursor=pointer]:
+            - /url: https://www.facebook.com/enlaceschaco
+            - generic [ref=e1038]: 
+          - link "" [ref=e1039] [cursor=pointer]:
+            - /url: https://www.enlaceschaco.com
+            - generic [ref=e1040]: 
+      - generic [ref=e1042]:
+        - textbox "Tu nombre" [ref=e1044]
+        - textbox "Tu email" [ref=e1046]
+        - textbox "Tu teléfono" [ref=e1048]
+        - combobox [ref=e1050]:
+          - option "Seleccioná tu rubro" [selected]
+          - option "Comercio / Kiosco"
+          - option "Supermercado"
+          - option "Restaurante / Bar"
+          - option "Gimnasio"
+          - option "Consultorio Médico"
+          - option "Estética / Spa"
+          - option "Taller de Reparaciones"
+          - option "Otro"
+        - textbox "Contanos sobre tu negocio..." [ref=e1052]
+        - button " Solicitar Demo Gratis" [ref=e1053] [cursor=pointer]:
+          - generic [ref=e1054]: 
+          - text: Solicitar Demo Gratis
+        - paragraph [ref=e1055]:
+          - text: También podés escribirnos directo a
+          - link "ivanfernandezm99@gmail.com" [ref=e1056] [cursor=pointer]:
+            - /url: mailto:ivanfernandezm99@gmail.com
+  - contentinfo [ref=e1057]:
+    - generic [ref=e1058]:
+      - generic [ref=e1059]:
+        - generic [ref=e1060]:
+          - generic [ref=e1061]:
+            - img "Enlaces Chaco" [ref=e1062]
+            - generic [ref=e1063]: Enlaces Chaco
+          - paragraph [ref=e1064]: Software de gestión y punto de venta para comercios argentinos. Vendé más, controlá mejor.
+          - generic [ref=e1065]:
+            - link "" [ref=e1066] [cursor=pointer]:
+              - /url: https://www.facebook.com/enlaceschaco
+              - generic [ref=e1067]: 
+            - link "" [ref=e1068] [cursor=pointer]:
+              - /url: https://wa.me/543624782201
+              - generic [ref=e1069]: 
+            - link "" [ref=e1070] [cursor=pointer]:
+              - /url: https://www.enlaceschaco.com
+              - generic [ref=e1071]: 
+        - generic [ref=e1072]:
+          - heading "Funcionalidades" [level=4] [ref=e1073]
+          - list [ref=e1074]:
+            - listitem [ref=e1075]:
+              - link "Ventas y Facturación" [ref=e1076] [cursor=pointer]:
+                - /url: "#funcionalidades"
+            - listitem [ref=e1077]:
+              - link "Stock e Inventario" [ref=e1078] [cursor=pointer]:
+                - /url: "#funcionalidades"
+            - listitem [ref=e1079]:
+              - link "Caja y Finanzas" [ref=e1080] [cursor=pointer]:
+                - /url: "#funcionalidades"
+            - listitem [ref=e1081]:
+              - link "Factura Electrónica ARCA" [ref=e1082] [cursor=pointer]:
+                - /url: "#integraciones"
+        - generic [ref=e1083]:
+          - heading "Módulos" [level=4] [ref=e1084]
+          - list [ref=e1085]:
+            - listitem [ref=e1086]:
+              - link "Restaurantes" [ref=e1087] [cursor=pointer]:
+                - /url: "#modulos"
+            - listitem [ref=e1088]:
+              - link "Gimnasios" [ref=e1089] [cursor=pointer]:
+                - /url: "#modulos"
+            - listitem [ref=e1090]:
+              - link "Consultorios" [ref=e1091] [cursor=pointer]:
+                - /url: "#modulos"
+            - listitem [ref=e1092]:
+              - link "Turnos Online" [ref=e1093] [cursor=pointer]:
+                - /url: "#modulos"
+        - generic [ref=e1094]:
+          - heading "Contacto" [level=4] [ref=e1095]
+          - generic [ref=e1096]:
+            - paragraph [ref=e1097]:
+              - generic [ref=e1098]: 
+              - text: Resistencia, Chaco
+            - paragraph [ref=e1099]:
+              - generic [ref=e1100]: 
+              - text: +54 362 4782201
+            - paragraph [ref=e1101]:
+              - generic [ref=e1102]: 
+              - text: ivanfernandezm99@gmail.com
+      - paragraph [ref=e1104]: © 2025 Enlaces Chaco. Todos los derechos reservados.
+  - link "" [ref=e1106] [cursor=pointer]:
+    - /url: https://wa.me/543624782201?text=Hola!%20Me%20interesa%20el%20sistema%20POS%20Enlaces%20Chaco
+    - generic [ref=e1107]: 
+  - button "Abrir chat" [ref=e1109] [cursor=pointer]:
+    - generic [ref=e1110]: 

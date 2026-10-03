@@ -175,3 +175,42 @@ los caps y las lineas `Error executing`.
   la respuesta cruda era `503 Loading model`. NO era una regresion del fix, era
   el modelo muriendose. Verificar SIEMPRE el 8082 antes de concluir que algo
  and broke.
+
+## Contexto del 30B bajado 190K -> 150K (2026-10-03)
+
+**Por que:** `llama-code-30b-190k.service` recibia SIGKILL externo (`status=9/KILL`)
+mientras servia, no al cargar. Pre-existente (SIGKILL a las 22:37 y 23:25, antes de
+esta sesion). Indicio de OOM killer: 347Mi libres de 31Gi + 8Gi de swap usada.
+**NO CONFIRMADO** — `sudo` pide password y `journalctl -k` no es accesible como
+usuario. Es mitigacion por hipotesis, no por diagnostico confirmado.
+
+**Cuanto vale el contexto.** Medido del GGUF (no estimado): 48 capas,
+head_count_kv 4, key/value_length 128, KV en `-ctk q4_0 -ctv q4_0` y
+`--no-kv-offload` (KV en RAM, no VRAM). Da ~27 KiB/token.
+  - 190208 tokens -> KV ~4.90 GiB
+  - 150016 tokens -> KV ~3.87 GiB  (lo que quedo configurado)
+
+**Archivos tocados (3):**
+1. `systemd/user/llama-code-30b-190k.service` — `-c 190000` -> `-c 150000`.
+   `Description=` reescrito para advertir que la clave dice 190k pero el
+   contexto real es 150000.
+2. `config.yaml` entrada `coder-30b-190k` — `-c` y `--ctx-size` a 150000,
+   `vram_mb` 22000 -> 18000 (igual que la entrada 150k). Comment de 7 lineas
+   explique el por que y la deuda de nombres.
+3. `config.yaml` `defaults.model` — comment actualizado: dice "contexto REAL 150K"
+   en vez de "190K (22GB VRAM)".
+
+**Lo que NO se toco a proposito:** la clave `coder-30b-190k` y el nombre del unit
+siguen igual, para no romper `defaults.model`, `web/app.py`, `tests/test_adopt.py`,
+`tests/test_gateway.py` y `tests/test_opencode_valuation.py` que la referencian.
+**Debt pendiente: renombrar a `coder-30b-150k`** — esa entrada y su unit ya existen
+y son byte-por-byte identicos salvo el `-c`. Es el fix limpio.
+
+**Resultado medido:** RSS de llama-server 5.68 -> 4.37 GiB (**-1.31 GiB**, mas de
+lo estimado porque el resto es allocator). `n_ctx` ahora 150016. 168 tests pasan.
+Verificacion en viva OK: `finish_reason=tool_calls`, `read_file`, path absoluto
+`/tmp/opencode/live_probe.txt` intacto.
+
+**Si vuelve a morir con SIGKILL en 150K:** el contexto no era la causa. Bajar a
+140000 solo libera ~86Mi mas, asi que no vale la pena — el culpable es otro proceso
+comiendose la RAM. Para confirmar hace falta(root o|Uso de root para ver kernel journal).

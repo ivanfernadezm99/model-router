@@ -1,0 +1,53 @@
+- generic [active] [ref=e1]:
+  - heading "Model Router" [level=1] [ref=e2]
+  - paragraph [ref=e3]: RTX 3090 24GB • VRAM exclusiva • Elegí modelo, escribí el prompt y adjuntá archivo si hace falta.
+  - generic [ref=e4]:
+    - heading "0. Modelo cargado en VRAM" [level=2] [ref=e5]
+    - paragraph [ref=e6]: "Todos los del registry. Elegí uno y dale Cargar: hace el switch exclusivo (baja el anterior, sube este). Tarda hasta 4 min en modelos de ~20GB."
+    - combobox [ref=e7]:
+      - option "○ coder-14b-100k — 19.5GB VRAM (:8082)"
+      - option "○ coder-14b-150k — 18.6GB VRAM (:8082)"
+      - option "○ coder-14b-190k — 21.5GB VRAM (:8082)"
+      - option "● coder-14b-300k-ram — 11.7GB VRAM (:8082) [ACTIVO]" [selected]
+      - option "○ coder-q5-65k — 17.6GB VRAM (:8082)"
+      - option "○ wan-14b — 19.5GB VRAM (:8189)"
+      - option "○ wan-i2v-14b — 19.5GB VRAM (:8191)"
+      - option "○ echomimic-v2 — 7.8GB VRAM (:8192)"
+      - option "○ sdxl — 6.3GB VRAM (:8188)"
+    - generic [ref=e8]: "300k con KV cache en RAM (--no-kv-offload). GPU ~11GB, KV ~16GB en RAM. Lenta por PCIe y YaRN 9x (puede degradar lejos). Va por gateway /v1. Contexto: 300000 tokens (~293k). Servicio llama-code-300k-ram.service, puerto 8082, 11.7GB VRAM. Ya está cargado."
+    - button "Cargar en VRAM" [ref=e9] [cursor=pointer]
+  - generic [ref=e10]:
+    - heading "1. Elegí el modelo para el job" [level=2] [ref=e11]
+    - combobox [ref=e12]:
+      - option "🎥 video — Texto → Video (Wan T2V :8189)" [selected]
+      - option "🖼️ i2v — Foto → Video animado (Wan I2V :8191)"
+      - option "👤 avatar — Foto + audio → vos hablando (EchoMimicV2 :8192)"
+      - option "🖌️ image — Crear / mejorar foto (SDXL :8188)"
+    - generic [ref=e13]: "Crea un video desde cero a partir de texto. Sin archivo: solo prompt. Ideal para escenas o fondos."
+  - generic [ref=e14]:
+    - heading "2. Prompt + archivos" [level=2] [ref=e15]
+    - generic [ref=e16]: Texto / prompt
+    - textbox "Texto / prompt" [ref=e17]:
+      - /placeholder: "Ej: cámara lenta recorre el POS... / Hola, les presento mi sistema..."
+    - button "Enviar job" [ref=e18] [cursor=pointer]
+  - generic [ref=e19]:
+    - generic [ref=e20]:
+      - heading "VRAM y estado" [level=2] [ref=e21]
+      - generic [ref=e22]:
+        - strong [ref=e23]: "Modelo:"
+        - text: ninguno
+        - strong [ref=e24]: "VRAM:"
+        - text: 10.1 GB / 24 GB
+        - strong [ref=e25]: "Estado:"
+        - text: idle
+    - generic [ref=e26]:
+      - heading "Cola de jobs" [level=2] [ref=e27]
+      - generic [ref=e29]: 71b1a102... — completed
+  - generic [ref=e30]:
+    - heading "Logs y errores de carga" [level=2] [ref=e31]
+    - button "Ver logs" [ref=e32] [cursor=pointer]
+  - paragraph [ref=e33]:
+    - text: "Monitor simple:"
+    - link "/monitor" [ref=e34] [cursor=pointer]:
+      - /url: /monitor
+    - text: "• Tailscale: http://100.69.147.88:5000"

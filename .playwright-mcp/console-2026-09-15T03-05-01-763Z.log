@@ -1,0 +1,4 @@
+[  335309ms] [ERROR] Failed to load resource: the server responded with a status of 502 (BAD GATEWAY) @ http://127.0.0.1:5000/api/queue:0
+[  335314ms] [ERROR] Failed to load resource: the server responded with a status of 502 (BAD GATEWAY) @ http://127.0.0.1:5000/api/health:0
+[  485267ms] [ERROR] Failed to load resource: the server responded with a status of 502 (BAD GATEWAY) @ http://127.0.0.1:5000/api/health:0
+[  485269ms] [ERROR] Failed to load resource: the server responded with a status of 502 (BAD GATEWAY) @ http://127.0.0.1:5000/api/queue:0

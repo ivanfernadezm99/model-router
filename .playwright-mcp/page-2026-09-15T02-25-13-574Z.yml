@@ -1,0 +1,17 @@
+- generic [active] [ref=e1]:
+  - heading "Model Router Monitor" [level=1] [ref=e2]
+  - paragraph [ref=e3]: RTX 3090 24GB • VRAM exclusiva por modelo • Jobs via ./*.sh scripts
+  - generic [ref=e4]:
+    - heading "VRAM y Estado" [level=2] [ref=e5]
+    - generic [ref=e6]: Cargando...
+  - generic [ref=e7]:
+    - heading "Cola de Jobs" [level=2] [ref=e8]
+    - generic [ref=e9]: Cargando cola...
+  - generic [ref=e10]:
+    - heading "Cómo Crear Jobs" [level=2] [ref=e11]
+    - list [ref=e12]:
+      - listitem [ref=e13]: ./video.sh "prompt" → Texto → Video (:8189)
+      - listitem [ref=e14]: ./i2v.sh foto.png "prompt" → Foto → Video animado (:8191)
+      - listitem [ref=e15]: ./avatar.sh foto.png audio.wav "texto" → Avatar hablante (:8192)
+      - listitem [ref=e16]: ./mejorar.sh foto.png "mejora" → SDXL img2img (:8188)
+    - paragraph [ref=e17]: "Tailscale: http://100.69.147.88:5000"

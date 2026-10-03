@@ -1,0 +1,43 @@
+- generic [active] [ref=e1]:
+  - heading "Model Router" [level=1] [ref=e2]
+  - paragraph [ref=e3]: RTX 3090 24GB • VRAM exclusiva • Elegí modelo, escribí el prompt y adjuntá archivo si hace falta.
+  - generic [ref=e4]:
+    - heading "0. Modelo cargado en VRAM" [level=2] [ref=e5]
+    - paragraph [ref=e6]: "Los 6 del registry. Elegí uno y dale Cargar: hace el switch exclusivo (baja el anterior, sube este). Tarda hasta 4 min en modelos de 20GB."
+    - combobox [ref=e7]:
+      - option "○ coder-14b-100k — 19.5GB VRAM (:8082)" [selected]
+      - option "○ coder-14b-150k — 18.6GB VRAM (:8082)"
+      - option "○ coder-14b-200k-ram — 11.7GB VRAM (:8082)"
+      - option "○ coder-q5-65k — 17.6GB VRAM (:8082)"
+      - option "○ wan-14b — 19.5GB VRAM (:8189)"
+      - option "○ wan-i2v-14b — 19.5GB VRAM (:8191)"
+      - option "○ echomimic-v2 — 7.8GB VRAM (:8192)"
+      - option "○ sdxl — 6.3GB VRAM (:8188)"
+    - generic [ref=e8]: "Código y chat con Qwen2.5-Coder-14B (Q4). Óptimo estable con YaRN (backup verificado). Va por gateway /v1. Contexto: 100000 tokens (~98k). Servicio llama-code-q4.service, puerto 8082, 19.5GB VRAM. Cargar lo sube con switch exclusivo."
+    - button "Cargar en VRAM" [ref=e9] [cursor=pointer]
+  - generic [ref=e10]:
+    - heading "1. Elegí el modelo para el job" [level=2] [ref=e11]
+    - combobox [ref=e12]:
+      - option "🎥 video — Texto → Video (Wan T2V :8189)" [selected]
+      - option "🖼️ i2v — Foto → Video animado (Wan I2V :8191)"
+      - option "👤 avatar — Foto + audio → vos hablando (EchoMimicV2 :8192)"
+      - option "🖌️ image — Crear / mejorar foto (SDXL :8188)"
+    - generic [ref=e13]: "Crea un video desde cero a partir de texto. Sin archivo: solo prompt. Ideal para escenas o fondos."
+  - generic [ref=e14]:
+    - heading "2. Prompt + archivos" [level=2] [ref=e15]
+    - generic [ref=e16]: Texto / prompt
+    - textbox "Texto / prompt" [ref=e17]:
+      - /placeholder: "Ej: cámara lenta recorre el POS... / Hola, les presento mi sistema..."
+    - button "Enviar job" [ref=e18] [cursor=pointer]
+  - generic [ref=e19]:
+    - generic [ref=e20]:
+      - heading "VRAM y estado" [level=2] [ref=e21]
+      - generic [ref=e22]: Cargando...
+    - generic [ref=e23]:
+      - heading "Cola de jobs" [level=2] [ref=e24]
+      - generic [ref=e25]: Cargando...
+  - paragraph [ref=e26]:
+    - text: "Monitor simple:"
+    - link "/monitor" [ref=e27] [cursor=pointer]:
+      - /url: /monitor
+    - text: "• Tailscale: http://100.69.147.88:5000"

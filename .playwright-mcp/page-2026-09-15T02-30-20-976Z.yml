@@ -1,0 +1,49 @@
+- generic [active] [ref=e1]:
+  - heading "Model Router" [level=1] [ref=e2]
+  - paragraph [ref=e3]: RTX 3090 24GB • VRAM exclusiva • Elegí modelo, escribí el prompt y adjuntá archivo si hace falta.
+  - generic [ref=e4]:
+    - heading "1. Elegí el modelo" [level=2] [ref=e5]
+    - combobox [ref=e6]:
+      - option "🎥 video — Texto → Video (Wan T2V :8189)"
+      - option "🖼️ i2v — Foto → Video animado (Wan I2V :8191)"
+      - option "👤 avatar — Foto + audio → vos hablando (EchoMimicV2 :8192)" [selected]
+      - option "🖌️ image — Crear / mejorar foto (SDXL :8188)"
+    - generic [ref=e7]: "Te hace hablar: adjuntá tu foto y un audio con tu voz + el texto. Genera cara/torso sincronizado."
+  - generic [ref=e8]:
+    - heading "2. Prompt + archivos" [level=2] [ref=e9]
+    - generic [ref=e10]: Texto / prompt
+    - textbox "Texto / prompt" [ref=e11]:
+      - /placeholder: "Ej: cámara lenta recorre el POS... / Hola, les presento mi sistema..."
+    - generic [ref=e33]:
+      - generic [ref=e34]: Imagen o video (examinar)
+      - button "Imagen o video (examinar)" [ref=e35]
+    - generic [ref=e36]:
+      - generic [ref=e37]: Audio con tu voz (examinar, solo avatar)
+      - button "Audio con tu voz (examinar, solo avatar)" [ref=e38]
+    - button "Enviar job" [ref=e12] [cursor=pointer]
+  - generic [ref=e13]:
+    - generic [ref=e14]:
+      - heading "VRAM y estado" [level=2] [ref=e15]
+      - generic [ref=e16]:
+        - strong [ref=e39]: "Modelo:"
+        - text: ninguno
+        - strong [ref=e40]: "VRAM:"
+        - text: 0.0 GB / 24 GB
+        - strong [ref=e41]: "Estado:"
+        - text: idle
+    - generic [ref=e17]:
+      - heading "Cola de jobs" [level=2] [ref=e18]
+      - generic [ref=e19]:
+        - generic [ref=e42]: a94868fb... — running
+        - generic [ref=e43]: a6cb1598... — failed
+        - generic [ref=e44]: 93bfd6d5... — failed
+        - generic [ref=e45]: 88bb9d42... — failed
+        - generic [ref=e46]: 8162279d... — running
+        - generic [ref=e47]: 712ebafa... — failed
+        - generic [ref=e48]: 6041dbb2... — completed
+        - generic [ref=e49]: 063a093e... — failed
+  - paragraph [ref=e20]:
+    - text: "Monitor simple:"
+    - link "/monitor" [ref=e21] [cursor=pointer]:
+      - /url: /monitor
+    - text: "• Tailscale: http://100.69.147.88:5000"

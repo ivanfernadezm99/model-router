@@ -1,0 +1,89 @@
+2026-10-02 21:10:58 | Backend 5xx port 8082 | request_id=00ef0681 status=503 hint= target=port:8082
+2026-10-02 21:11:00 | Backend 5xx port 8082 | request_id=219ad05a status=500 hint= target=port:8082
+2026-10-02 21:11:01 | Switch timeout: sdxl | health 8188/system_stats no respondió en 1200s — modelo no cargó
+2026-10-02 21:11:01 | Switch bloqueado: holds faltan | target=sdxl — cuda/kornia no disponibles
+2026-10-02 21:11:01 | Switch bloqueado: holds faltan | target=sdxl — cuda/kornia no disponibles
+2026-10-02 21:11:08 | Backend 5xx port 8082 | request_id=6159c31b status=503 hint= target=port:8082
+2026-10-02 21:11:26 | Backend 5xx port 8082 | request_id=22480b2f status=503 hint= target=port:8082
+2026-10-02 21:11:46 | Backend 5xx port 8082 | request_id=951bb9a1 status=500 hint= target=port:8082
+2026-10-02 21:11:48 | Switch timeout: sdxl | health 8188/system_stats no respondió en 1200s — modelo no cargó
+2026-10-02 21:11:48 | Switch bloqueado: holds faltan | target=sdxl — cuda/kornia no disponibles
+2026-10-02 21:11:48 | Switch bloqueado: holds faltan | target=sdxl — cuda/kornia no disponibles
+2026-10-02 21:12:02 | Backend 5xx port 8082 | request_id=54e5a88a status=503 hint= target=port:8082
+2026-10-02 21:12:21 | Backend 5xx port 8082 | request_id=0082c922 status=503 hint= target=port:8082
+2026-10-02 21:12:38 | Backend 5xx port 8082 | request_id=76dd28bf status=503 hint= target=port:8082
+2026-10-02 21:29:12 | Backend 5xx port 8082 | request_id=d1af8905 status=500 hint= target=port:8082
+2026-10-02 21:30:21 | Backend 5xx port 8082 | request_id=fb8ce13b status=500 hint= target=port:8082
+2026-10-02 21:30:22 | Switch timeout: sdxl | health 8188/system_stats no respondió en 1200s — modelo no cargó
+2026-10-02 21:30:22 | Switch bloqueado: holds faltan | target=sdxl — cuda/kornia no disponibles
+2026-10-02 21:30:22 | Switch bloqueado: holds faltan | target=sdxl — cuda/kornia no disponibles
+2026-10-02 21:30:53 | Backend 5xx port 8082 | request_id=803b7c87 status=500 hint= target=port:8082
+2026-10-02 21:30:54 | Switch timeout: sdxl | health 8188/system_stats no respondió en 1200s — modelo no cargó
+2026-10-02 21:30:54 | Switch bloqueado: holds faltan | target=sdxl — cuda/kornia no disponibles
+2026-10-02 21:30:54 | Switch bloqueado: holds faltan | target=sdxl — cuda/kornia no disponibles
+2026-10-02 21:31:39 | Backend 5xx port 8082 | request_id=f526d6d8 status=500 hint= target=port:8082
+2026-10-02 21:31:40 | Switch timeout: sdxl | health 8188/system_stats no respondió en 1200s — modelo no cargó
+2026-10-02 21:31:40 | Switch bloqueado: holds faltan | target=sdxl — cuda/kornia no disponibles
+2026-10-02 21:31:40 | Switch bloqueado: holds faltan | target=sdxl — cuda/kornia no disponibles
+2026-10-02 22:00:48 | Backend 5xx port 8082 | request_id=33a0bed2 status=500 hint= target=port:8082
+2026-10-02 22:00:49 | Switch timeout: sdxl | health 8188/system_stats no respondió en 1200s — modelo no cargó
+2026-10-02 22:00:49 | Switch bloqueado: holds faltan | target=sdxl — cuda/kornia no disponibles
+2026-10-02 22:00:49 | Switch bloqueado: holds faltan | target=sdxl — cuda/kornia no disponibles
+2026-10-02 22:08:27 | Backend 5xx port 8082 | request_id=1e3088a1 status=500 hint= target=port:8082
+2026-10-02 22:08:28 | Switch timeout: sdxl | health 8188/system_stats no respondió en 1200s — modelo no cargó
+2026-10-02 22:08:28 | Switch bloqueado: holds faltan | target=sdxl — cuda/kornia no disponibles
+2026-10-02 22:08:28 | Switch bloqueado: holds faltan | target=sdxl — cuda/kornia no disponibles
+2026-10-02 22:09:02 | Backend 5xx port 8082 | request_id=222b5073 status=500 hint= target=port:8082
+2026-10-02 22:09:03 | Switch timeout: sdxl | health 8188/system_stats no respondió en 1200s — modelo no cargó
+2026-10-02 22:09:03 | Switch bloqueado: holds faltan | target=sdxl — cuda/kornia no disponibles
+2026-10-02 22:09:03 | Switch bloqueado: holds faltan | target=sdxl — cuda/kornia no disponibles
+2026-10-02 22:22:48 | Backend 5xx port 8082 | request_id=f8d2e9e7 status=500 hint= target=port:8082
+2026-10-02 22:22:49 | Switch timeout: sdxl | health 8188/system_stats no respondió en 1200s — modelo no cargó
+2026-10-02 22:22:49 | Switch bloqueado: holds faltan | target=sdxl — cuda/kornia no disponibles
+2026-10-02 22:22:49 | Switch bloqueado: holds faltan | target=sdxl — cuda/kornia no disponibles
+2026-10-02 22:27:09 | Backend 5xx port 8082 | request_id=0f7eddbc status=500 hint= target=port:8082
+2026-10-02 22:27:10 | Switch timeout: sdxl | health 8188/system_stats no respondió en 1200s — modelo no cargó
+2026-10-02 22:27:10 | Switch bloqueado: holds faltan | target=sdxl — cuda/kornia no disponibles
+2026-10-02 22:27:10 | Switch bloqueado: holds faltan | target=sdxl — cuda/kornia no disponibles
+2026-10-02 22:30:03 | Backend 5xx port 8082 | request_id=1214735e status=500 hint= target=port:8082
+2026-10-02 22:30:04 | Switch timeout: sdxl | health 8188/system_stats no respondió en 1200s — modelo no cargó
+2026-10-02 22:30:04 | Switch bloqueado: holds faltan | target=sdxl — cuda/kornia no disponibles
+2026-10-02 22:30:04 | Switch bloqueado: holds faltan | target=sdxl — cuda/kornia no disponibles
+2026-10-02 22:30:20 | Backend 5xx port 8082 | request_id=2272260d status=500 hint= target=port:8082
+2026-10-02 22:30:21 | Switch timeout: sdxl | health 8188/system_stats no respondió en 1200s — modelo no cargó
+2026-10-02 22:30:21 | Switch bloqueado: holds faltan | target=sdxl — cuda/kornia no disponibles
+2026-10-02 22:30:21 | Switch bloqueado: holds faltan | target=sdxl — cuda/kornia no disponibles
+2026-10-02 22:35:51 | Backend 5xx port 8082 | request_id=0a2f7c26 status=500 hint= target=port:8082
+2026-10-02 22:35:52 | Switch timeout: sdxl | health 8188/system_stats no respondió en 1200s — modelo no cargó
+2026-10-02 22:35:52 | Switch bloqueado: holds faltan | target=sdxl — cuda/kornia no disponibles
+2026-10-02 22:35:52 | Switch bloqueado: holds faltan | target=sdxl — cuda/kornia no disponibles
+2026-10-02 22:37:33 | Backend 5xx port 8082 | request_id=0678dc51 status=500 hint= target=port:8082
+2026-10-02 22:37:34 | Switch timeout: sdxl | health 8188/system_stats no respondió en 1200s — modelo no cargó
+2026-10-02 22:37:34 | Switch bloqueado: holds faltan | target=sdxl — cuda/kornia no disponibles
+2026-10-02 22:37:34 | Switch bloqueado: holds faltan | target=sdxl — cuda/kornia no disponibles
+2026-10-02 23:24:22 | Backend 5xx port 8082 | request_id=11c3cd60 status=500 hint= target=port:8082
+2026-10-02 23:24:31 | Backend 5xx port 8082 | request_id=2a500aac status=500 hint= target=port:8082
+2026-10-02 23:24:37 | Backend 5xx port 8082 | request_id=54818c3d status=500 hint= target=port:8082
+2026-10-02 23:25:05 | Backend 5xx port 8082 | request_id=54d17923 status=500 hint= target=port:8082
+2026-10-02 23:25:06 | Switch timeout: sdxl | health 8188/system_stats no respondió en 1200s — modelo no cargó
+2026-10-02 23:25:06 | Switch bloqueado: holds faltan | target=sdxl — cuda/kornia no disponibles
+2026-10-02 23:25:06 | Switch bloqueado: holds faltan | target=sdxl — cuda/kornia no disponibles
+2026-10-03 01:28:44 | Backend 5xx port 8082 | request_id=25f7362f status=500 hint= target=port:8082
+2026-10-03 01:30:22 | Backend 5xx port 8082 | request_id=e107fa24 status=500 hint= target=port:8082
+2026-10-03 01:30:23 | Switch timeout: sdxl | health 8188/system_stats no respondió en 1200s — modelo no cargó
+2026-10-03 01:30:23 | Switch bloqueado: holds faltan | target=sdxl — cuda/kornia no disponibles
+2026-10-03 01:30:23 | Switch bloqueado: holds faltan | target=sdxl — cuda/kornia no disponibles
+2026-10-03 01:32:25 | Backend 5xx port 8082 | request_id=e7df2b60 status=500 hint= target=port:8082
+2026-10-03 01:32:26 | Switch timeout: sdxl | health 8188/system_stats no respondió en 1200s — modelo no cargó
+2026-10-03 01:32:26 | Switch bloqueado: holds faltan | target=sdxl — cuda/kornia no disponibles
+2026-10-03 01:32:26 | Switch bloqueado: holds faltan | target=sdxl — cuda/kornia no disponibles
+2026-10-03 01:35:35 | Backend 5xx port 8082 | request_id=18f9ccaa status=500 hint= target=port:8082
+2026-10-03 01:35:36 | Switch timeout: sdxl | health 8188/system_stats no respondió en 1200s — modelo no cargó
+2026-10-03 01:35:36 | Switch bloqueado: holds faltan | target=sdxl — cuda/kornia no disponibles
+2026-10-03 01:35:36 | Switch bloqueado: holds faltan | target=sdxl — cuda/kornia no disponibles
+2026-10-03 01:36:03 | Backend 5xx port 8082 | request_id=ecdd662b status=503 hint= target=port:8082
+2026-10-03 01:36:11 | Backend 5xx port 8082 | request_id=b1c21a4e status=503 hint= target=port:8082
+2026-10-03 09:07:02 | Backend 5xx port 8082 | request_id=9a1efc36 status=500 hint= target=port:8082
+2026-10-03 09:07:03 | Switch timeout: sdxl | health 8188/system_stats no respondió en 1200s — modelo no cargó
+2026-10-03 09:07:03 | Switch bloqueado: holds faltan | target=sdxl — cuda/kornia no disponibles
+2026-10-03 09:07:03 | Switch bloqueado: holds faltan | target=sdxl — cuda/kornia no disponibles
