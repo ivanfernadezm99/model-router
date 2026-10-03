@@ -2,6 +2,7 @@
 
 import json
 import logging
+import os
 import time
 import uuid
 
@@ -34,24 +35,19 @@ async def proxy_request(request: Request, target_port: int, retry_after: int | N
     # task-aware sampler: si viene de app.py usamos ese task, sino fallback a header
     _task_hint = (task or request.headers.get("x-model-hint", "") or "").strip().lower()
     _is_code = _task_hint in ("", "code")  # default code, pero si detector dijo code -> es code
-    # Heurística texto vs código: si el contenido no parece código, forzar modo texto para no pegar palabras
-    # Esto corrige el caso "email en español" que hoy cae en default:code y sufre DRY agresivo
+    # Text vs code: decides whether the aggressive anti-loop defaults apply.
+    # Requires positive code evidence. The previous version defaulted to code
+    # and carried a hardcoded Spanish word list ("criterium", "landing") added
+    # for one past incident — so any short message ("escribime un mail") was
+    # classified as code and got temp 0.2 + DRY 0.9 + top_k 20. Guessing
+    # "code" by default means guessing wrong for everything short.
+    # Loop protection for real runaway generations belongs to LoopGuardMiddleware.
     def _looks_like_code(text: str) -> bool:
         if not text:
-            return True  # fallback conservador: asumir código
+            return False
         lower = text.lower()
-        code_markers = ("```", "def ", "import ", "class ", "function ", "const ", "let ", "var ", "npm ", "pip ", "cargo ", "select ", "from ", "where ", "curl ", "git ", "docker ", "{\n", ";\n")
-        if any(m in lower for m in code_markers):
-            return True
-        # si tiene mucho texto natural español sin símbolos de código -> texto
-        text_markers = ("estimado", "postulación", "atentamente", "experiencia", "integración", "hola", "asunto:", "ingeniero", "criterium", "landing")
-        if any(m in lower for m in text_markers):
-            return False
-        # fallback: si es largo y sin marcadores de código, tratar como texto
-        if len(text) > 200 and text.count("\n") < 5 and " " in text:
-            # conteo simple: si predominan palabras pegadas sin estructura de código
-            return False
-        return True
+        code_markers = ("```", "def ", "import ", "class ", "function ", "const ", "let ", "var ", "npm ", "pip ", "cargo ", "select ", "from ", "where ", "curl ", "git ", "docker ", "{\n", ";\n", "()", "=>", "</", "/>", "#!/")
+        return any(m in lower for m in code_markers)
 
     # build target url — only loopback allowed
     path = request.url.path
@@ -69,15 +65,34 @@ async def proxy_request(request: Request, target_port: int, retry_after: int | N
 
     body = await request.body()
 
-    # --- sampler anti-loop + determinístico (190K YaRN 5.9x) — sin margen para alucinar ---
-    # Fixes: n_tokens=65961 loop at 20t/s. 190K necesita temp baja para no alucinar con YaRN alto.
-    # FIX palabras pegadas: DRY con allowed_length=2 es agresivo para texto natural (español) y se come espacios
-    # para evitar bigrama " de", " en". Solo aplicar DRY agresivo a task=code; para texto usar modo suave.
+    # --- sampler defaults ---
+    #
+    # Original intent: stop the n_tokens=65961 loop that showed up at 20t/s on
+    # 190K YaRN 5.9x. That goal was met by unconditionally rewriting the client's
+    # sampling on every /v1 request (1424/1424 in journalctl, identical patch).
+    #
+    # That was wrong for agent traffic. A tool call has to emit a file path
+    # character for character, and a path IS repetition: "/home", "servidor",
+    # ".py" repeat inside a single path and across consecutive tool calls.
+    # DRY with dry_allowed_length=2 penalises exactly that, so the sampler was
+    # fighting the model on the one task that needs precision most.
+    #
+    # Two rules now:
+    #   1. Never override a value the client set. A proxy that rewrites
+    #      explicit intent is not a proxy. Defaults only fill absent keys.
+    #   2. Agent traffic (the request carries `tools`) gets repetition-friendly
+    #      defaults, because its output is paths and JSON, not prose.
+    # Anti-loop settings stay for non-agent code traffic, which is where the
+    # loop actually came from.
+    #
+    # SAMPLER_DEFAULTS_DISABLED=1 turns the whole block off.
+    _sampler_off = os.environ.get("SAMPLER_DEFAULTS_DISABLED", "0") == "1"
     try:
         ctype_req = request.headers.get("content-type", "")
-        if "application/json" in ctype_req and "/v1/" in path and body:
+        if not _sampler_off and "application/json" in ctype_req and "/v1/" in path and body:
             parsed = json.loads(body)
             if isinstance(parsed, dict) and ("prompt" in parsed or "messages" in parsed):
+                is_agent = bool(parsed.get("tools"))
                 # re-evaluar _is_code con contenido real si el detector dijo "code" por default
                 try:
                     _content_probe = ""
@@ -97,69 +112,55 @@ async def proxy_request(request: Request, target_port: int, retry_after: int | N
                 except Exception:
                     pass
                 patched = {}
-                rp = parsed.get("repeat_penalty")
-                if rp is None or rp == 1.0:
-                    parsed["repeat_penalty"] = 1.15
-                    patched["repeat_penalty"] = 1.15
-                if "repeat_last_n" not in parsed:
-                    parsed["repeat_last_n"] = 256
-                    patched["repeat_last_n"] = 256
-                # DRY: solo para código; para texto deshabilitar o usar allowed_length=8 suave
-                if _is_code:
-                    if "dry_multiplier" not in parsed or parsed.get("dry_multiplier") == 0:
+
+                def _default(key, value):
+                    """Set only if the client did not specify it. Never override."""
+                    if key not in parsed or parsed.get(key) is None:
+                        parsed[key] = value
+                        patched[key] = value
+
+                # --- repetition control ---
+                # Agent output is paths and JSON: mild penalty, wide window.
+                # Non-agent code keeps the stronger penalty that killed the loop.
+                _default("repeat_penalty", 1.05 if is_agent else 1.15)
+                _default("repeat_last_n", 256)
+
+                # --- DRY ---
+                # Aggressive DRY is only for non-agent code. On agent traffic
+                # it stays off unless the client asked for it, because DRY
+                # penalises the repeated substrings that make up a file path.
+                if _is_code and not is_agent:
+                    if not parsed.get("dry_multiplier"):
                         parsed["dry_multiplier"] = 0.9
                         parsed["dry_base"] = 1.75
                         parsed["dry_allowed_length"] = 2
                         parsed["dry_penalty_last_n"] = 512
                         patched["dry_multiplier"] = 0.9
                         patched["dry_task"] = "code"
-                else:
-                    # texto natural: desactivar DRY agresivo, usar allowed_length=8 si viene seteado
-                    if parsed.get("dry_multiplier", 0) != 0:
-                        # si el caller ya pidió DRY, suavizarlo
-                        if parsed.get("dry_allowed_length", 2) < 8:
-                            parsed["dry_allowed_length"] = 8
-                            patched["dry_allowed_length"] = "softened_to_8_for_text"
-                    else:
-                        # explícitamente deshabilitar DRY para texto
-                        parsed["dry_multiplier"] = 0
-                        patched["dry_multiplier"] = "disabled_for_text"
-                # Temperatura: code -> determinística 0.2, texto -> 0.4-0.6 más natural
-                t = parsed.get("temperature")
-                if _is_code:
-                    if t is None:
-                        parsed["temperature"] = 0.2
-                        patched["temperature"] = 0.2
-                    elif t > 0.3:
-                        parsed["temperature"] = 0.2
-                        patched["temperature"] = "capped_0.2(from %.2f)" % t
-                else:
-                    if t is None:
-                        parsed["temperature"] = 0.4
-                        patched["temperature"] = 0.4
-                    elif t > 0.7:
-                        parsed["temperature"] = 0.6
-                        patched["temperature"] = "capped_0.6(from %.2f)" % t
-                    elif t < 0.2:
-                        parsed["temperature"] = 0.4
-                        patched["temperature"] = "raised_0.4(from %.2f)" % t
-                if "top_p" not in parsed or parsed.get("top_p") > 0.9:
-                    # top_p alto + YaRN = alucinación, cap a 0.85
-                    old = parsed.get("top_p")
-                    parsed["top_p"] = 0.85
-                    patched["top_p"] = "capped_0.85(from %s)" % str(old)
-                if "top_k" not in parsed:
-                    parsed["top_k"] = 20
-                    patched["top_k"] = 20
-                elif parsed.get("top_k", 0) > 40:
-                    oldk = parsed.get("top_k")
-                    parsed["top_k"] = 20
-                    patched["top_k"] = "capped_20(from %s)" % str(oldk)
+                elif not _is_code and not is_agent and parsed.get("dry_multiplier"):
+                    # prose asked for DRY: soften so it stops eating spaces.
+                    # Never for agent traffic — rule 1 is absolute.
+                    if parsed.get("dry_allowed_length", 2) < 8:
+                        parsed["dry_allowed_length"] = 8
+                        patched["dry_allowed_length"] = "softened_to_8_for_text"
+
+                # --- temperature ---
+                _default("temperature", 0.2 if _is_code else 0.6)
+
+                # --- nucleus / top-k ---
+                # Defaults only. The old code capped whatever the client sent,
+                # which is how an explicit top_p of 0.95 became 0.85.
+                _default("top_p", 0.85 if (_is_code and not is_agent) else 0.9)
+                # top_k truncates the tail hard; agent output needs that tail
+                # to finish a long path token by token.
+                if not is_agent:
+                    _default("top_k", 20)
+
                 if patched:
                     body = json.dumps(parsed).encode()
                     if "content-length" in fwd_headers:
                         fwd_headers["content-length"] = str(len(body))
-                    logger.info(json.dumps({"request_id": request_id, "sampler_patch": True, "patched": patched, "target": target_port, "task": _task_hint or "code"}))
+                    logger.info(json.dumps({"request_id": request_id, "sampler_defaults": True, "patched": patched, "agent": is_agent, "target": target_port, "task": _task_hint or "code"}))
     except Exception as e:
         logger.warning(json.dumps({"request_id": request_id, "sampler_patch_error": str(e)}))
 

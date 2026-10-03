@@ -29,7 +29,13 @@ registry = Registry()
 try:
     registry.load()
 except Exception as exc:
-    logger.warning(f"registry load failed at import: {exc}")
+    # Loud on purpose. This used to log a warning and keep running with an
+    # empty models dict, so every resolve() raised "unknown model" and the
+    # gateway answered 400 to everything with no trace of the real cause.
+    # validate_config rejects the whole file if one model has a port or health
+    # endpoint outside the ALLOWED allowlist in src/common/validation.py.
+    logger.error(f"registry load failed: {type(exc).__name__}: {exc}", exc_info=True)
+    raise
 
 orchestrator = Orchestrator(registry=registry)
 logger.info(f"gateway: orchestrator created id={id(orchestrator)} module={__name__} file={__file__}")
