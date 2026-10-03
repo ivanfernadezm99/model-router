@@ -61,3 +61,53 @@ Los agentes (opencode → `http://127.0.0.1:8000/v1`, confirmado en `~/.config/o
 - **Template Qwen2.5 sobre modelos Qwen3-Coder**: los `coder-30b-*` son Qwen3-Coder pero usan `qwen25-coder-tools.jinja`. Los tags nativos de tool call de Qwen3 difieren. Decisión de modelo, no de template.
 - `systemd/user/` desincronizado de `~/.config/systemd/user/`: faltan `llama-code-30b-150k.service`, `llama-code-30b-190k.service` (el default) y `llama-code-30b-q5-100k.service` en el repo.
 
+
+---
+
+# Cierre de la rama — estado al 2026-10-03
+
+## Dividir el template por familia de modelo
+El usuario decidió partir el template en dos en lugar de forzar un único formato:
+
+| Familia | Unidades | Template |
+|---|---|---|
+| Qwen2.5-Coder | 4 | `templates/qwen25-coder-tools.jinja` — `<\|tool_call\|>` |
+| Qwen3 / Qwen3-Coder | 6 | `templates/qwen3-coder-tools.jinja` — `<tool_call>` con U+200B |
+| Qwen3.8-27B | 2 | template embebido nativo, sin override |
+
+Los marcadores de Qwen3 están confirmados en `~/llama.cpp/common/chat.cpp`. El ZWSP
+(U+200B) es invisible y se pierde al pasar por shell: los tests lo escriben como
+escape `\u200b`, nunca literal.
+
+## Restricción real: el render corre en minja, no en Jinja2
+`~/llama.cpp/common/jinja/caps.cpp` prueba el template al cargar y marca
+`supports_tools`/`supports_tool_calls` en `false` si el render falla. Consecuencia
+práctica: el template solo puede usar la intersección de ambos motores.
+
+- Jinja2 tiene `trim`; minja no → nunca usarlo.
+- minja tiene `strip`/`lstrip`/`rstrip`; el Jinja2 local no → nunca usarlos.
+- El template actual evita filtros de whitespace con `"{" in arguments`.
+
+`tests/test_template_jinja_subset.py` es el guard de esto. Su parser tiene que
+descartar literales primero: el system prompt es prosa en inglés y "is final for
+that call" se leía como el test jinja `is final`.
+
+## PENDIENTE — el fix no está verificado
+`GET /props` sigue reportando:
+
+```
+supports_tools: false
+supports_tool_calls: false
+supports_object_arguments: false
+```
+
+El modelo emite el marcador y el path absoluto correctos, pero
+`message.tool_calls` llega vacío tanto por `:8000` como directo a `:8082`. Se
+descartó el gateway como causa.
+
+Este commit registra la separación de templates, que es lo que ya está
+instalado y corriendo en la máquina, pero **no** una solución verificada.
+
+## Deuda deliberadamente NO tocada
+`TASK_TO_MODEL["code"]` sigue en `coder-14b-100k` mientras `config.yaml` declara
+`coder-30b-190k`. El usuario decidió dejarlo manual por ahora, sin automatizar.

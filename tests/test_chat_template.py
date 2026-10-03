@@ -14,13 +14,32 @@ import pathlib
 import jinja2
 import pytest
 
-TEMPLATE_PATH = pathlib.Path(__file__).resolve().parents[1] / "templates" / "qwen25-coder-tools.jinja"
+ZWSP = "\u200b"
+TEMPLATES = pathlib.Path(__file__).resolve().parents[1] / "templates"
+
+# Each family has its own native tool-call envelope. llama.cpp's parser for
+# this build matches them exactly (common/chat.cpp), so the template has to
+# teach the same one or the model emits tool calls as plain text.
+FAMILIES = {
+    "qwen25-coder-tools.jinja": ("<|tool_call|>", "<|tool_call|>"),
+    "qwen3-coder-tools.jinja": ("<" + ZWSP + "tool_call>", "</" + ZWSP + "tool_call>"),
+}
+
+CURRENT = "qwen25-coder-tools.jinja"
+
+
+@pytest.fixture(params=sorted(FAMILIES), autouse=True)
+def _family(request):
+    """Every test below runs once per template family."""
+    global CURRENT
+    CURRENT = request.param
+    return CURRENT
 
 TOOLS = [{"type": "function", "function": {"name": "read", "description": "read a file", "parameters": {"type": "object", "properties": {"filePath": {"type": "string"}}, "required": ["filePath"]}}}]
 
 
 def render(messages, tools=TOOLS, add_generation_prompt=True):
-    tpl = jinja2.Template(TEMPLATE_PATH.read_text())
+    tpl = jinja2.Template((TEMPLATES / CURRENT).read_text())
     return tpl.render(messages=messages, tools=tools, add_generation_prompt=add_generation_prompt)
 
 
@@ -28,14 +47,15 @@ PATH = "/home/servidor/Descargas/model-router/src/gateway/proxy.py"
 
 
 def _assistant_calls(out):
-    """Every <tools>...</tools> block in the rendered prompt, parsed.
+    """Every tool-call envelope in the rendered prompt, parsed.
 
-    Skips the tool-schema block and the format instruction, which also sit
-    inside <tools> tags but are not tool calls.
+    The system prompt also contains the envelope as a format instruction with
+    placeholder arguments, so anything that is not valid JSON is skipped.
     """
+    open_m, close_m = FAMILIES[CURRENT]
     calls = []
-    for chunk in out.split("<tools>")[1:]:
-        raw = chunk.split("</tools>")[0].strip()
+    for chunk in out.split(open_m)[1:]:
+        raw = chunk.split(close_m)[0].strip()
         try:
             parsed = json.loads(raw)
         except json.JSONDecodeError:
@@ -166,7 +186,8 @@ def test_generated_tool_call_format_is_valid_json():
         {"role": "assistant", "content": "", "tool_calls": [{"function": {"name": "read", "arguments": json.dumps({"filePath": PATH})}}]},
     ]
     out = render(messages)
-    instruction = '<tools>\n{"name": <function-name>, "arguments": <args-json-object>}\n</tools>'
+    open_m, close_m = FAMILIES[CURRENT]
+    instruction = open_m + '\n{"name": <function-name>, "arguments": <args-json-object>}\n' + close_m
     assert instruction in out
     for call in _assistant_calls(out):
         assert isinstance(call["arguments"], dict)

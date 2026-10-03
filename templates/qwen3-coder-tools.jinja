@@ -70,7 +70,7 @@
 {%- set fn = tool.function if tool.function is defined else tool -%}
 {"type": "function", "function": {"name": {{ fn.name | tojson }}, "description": {{ (fn.description | default('')) | tojson }}, "parameters": {{ (fn.parameters | default({})) | tojson }}}}
 {%- endfor %}
-{{- "\n</tools>\n\nIf you call a function, reply ONLY in this exact format:\n<|tool_call|>\n{\"name\": <function-name>, \"arguments\": <args-json-object>}\n<|tool_call|><|im_end|>\n" }}
+{{- "\n</tools>\n\nIf you call a function, reply ONLY in this exact format:\n<​tool_call>\n{\"name\": <function-name>, \"arguments\": <args-json-object>}\n</​tool_call><|im_end|>\n" }}
 {%- else -%}
 {%- if system_content -%}
 {{- '<|im_start|>system\n' + system_content + '<|im_end|>\n' }}
@@ -102,16 +102,16 @@
 {%- if tool_call.function is defined -%}
 {%- set tool_call = tool_call.function -%}
 {%- endif -%}
-{{- '\n<|tool_call|>\n' }}
+{{- '\n<​tool_call>\n' }}
 {{- call(tool_call.name, tool_call.arguments) }}
-{{- '<|tool_call|>' }}
+{{- '</​tool_call>' }}
 {%- endfor -%}
 {%- if message.content is sequence -%}
 {%- for block in message.content -%}
 {%- if block is mapping and block.get('type') == 'tool_use' -%}
-{{- '\n<|tool_call|>\n' }}
+{{- '\n<​tool_call>\n' }}
 {{- call(block.get('name'), block.get('input')) }}
-{{- '<|tool_call|>' }}
+{{- '</​tool_call>' }}
 {%- endif -%}
 {%- endfor -%}
 {%- endif -%}
