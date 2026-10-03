@@ -92,22 +92,41 @@ práctica: el template solo puede usar la intersección de ambos motores.
 descartar literales primero: el system prompt es prosa en inglés y "is final for
 that call" se leía como el test jinja `is final`.
 
-## PENDIENTE — el fix no está verificado
-`GET /props` sigue reportando:
+## RESUELTO — causa raíz y verificación
 
-```
-supports_tools: false
-supports_tool_calls: false
-supports_object_arguments: false
-```
+`~/llama.cpp/build/bin/test-chat-template` acepta un template arbitrario y tiene
+`--with-tools`. Imprime `JJ_DEBUG` (el flag es runtime, no `NDEBUG`), así que da
+el error exacto de minja en milisegundos, sin los 70s de reiniciar el modelo.
+Eso turned 30s-bisects en 300ms.
 
-El modelo emite el marcador y el path absoluto correctos, pero
-`message.tool_calls` llega vacío tanto por `:8000` como directo a `:8082`. Se
-descartó el gateway como causa.
+Dos causas raíz, ambas donde **jinja2 degrada en silencio y minja revienta**:
 
-Este commit registra la separación de templates, que es lo que ya está
-instalado y corriendo en la máquina, pero **no** una solución verificada.
+1. **`| default(...)` sobre una propiedad ausente.** minja corre varios probes
+   con payloads de `tools` distintos; cuando `parameters` no viene, el valor es
+   `Undefined`, y ahí no existen ni `default` ni `tojson`. Reemplazado por
+   `{%- if x is defined and x -%}` con `set` explícito.
+2. **`is sequence` da `true` para un String.** Error clásico de Jinja: un string
+   es una secuencia. Con `content` string el `for` entraba e iteraba un string.
+   Guard: `is sequence and is not string`.
+
+Y la causa raíz del bug original, que venía de un diagnóstico previo equivocado:
+
+3. **El U+200B no debía estar.** `common/chat.cpp` matchea `<tool_call>`
+   plano y **no hay ZWSP en ningún archivo de llama.cpp**. El ZWSP enseñaba al
+   modelo a emitir un marker que el parser no puede matchear: por eso salía
+   texto con el marker y `tool_calls: 0`. Eliminado; `test_qwen3_template_has_no_zero_width_space`
+   lo impide volver.
+
+## Verificación
+
+- `test-chat-template --with-tools` sobre ambas plantillas: 0 errores de ejecución,
+  `supports_tools/tool_calls/object_arguments/parallel_tool_calls = true`.
+- `/props` en vivo: los cuatro en `true`.
+- Request directo a `:8082`: `finish_reason: tool_calls`, 1 tool call,
+  `{"filePath": "/home/servidor/Descargas/model-router/src/gateway/proxy.py"}`, `content` vacío.
+- Idéntico vía gateway `:8000`.
+- `python3 -m pytest tests/ -q` → 147 passed.
 
 ## Deuda deliberadamente NO tocada
 `TASK_TO_MODEL["code"]` sigue en `coder-14b-100k` mientras `config.yaml` declara
-`coder-30b-190k`. El usuario decidió dejarlo manual por ahora, sin automatizar.
+`coder-30b-190k`. Decisión del usuario: manual por ahora, sin automatizar.

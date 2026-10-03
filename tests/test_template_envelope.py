@@ -29,8 +29,13 @@ import pytest
 ZWSP = "\u200b"
 TEMPLATES = pathlib.Path(__file__).resolve().parents[1] / "templates"
 
-Q3_OPEN = "<" + ZWSP + "tool_call>"
-Q3_CLOSE = "</" + ZWSP + "tool_call>"
+# Plain markers, no zero-width space. llama.cpp's parser is the consumer here:
+# common/chat.cpp matches "<tool_call>" / "</tool_call>" as literal
+# bytes and has no ZWSP anywhere in the codebase. A ZWSP in the template
+# teaches the model to emit a marker the parser cannot match, which is what
+# silently produced content-with-tool-call-text and tool_calls: 0.
+Q3_OPEN = "<tool_call>"
+Q3_CLOSE = "</tool_call>"
 Q25 = "<|tool_call|>"
 
 PATH = "/home/servidor/Descargas/model-router/src/gateway/proxy.py"
@@ -48,12 +53,15 @@ def render(name):
     return tpl.render(messages=HISTORY, tools=TOOLS, add_generation_prompt=True)
 
 
-# --- the ZWSP is the whole point; a normalising editor or git filter eats it ---
+# --- the parser defines the marker; nothing may sneak a ZWSP back in ---
 
 
-def test_qwen3_template_carries_the_zero_width_space():
+def test_qwen3_template_has_no_zero_width_space():
     raw = (TEMPLATES / "qwen3-coder-tools.jinja").read_text()
-    assert ZWSP in raw, "U+200B missing — tool calls will not parse"
+    assert ZWSP not in raw, (
+        "U+200B reintroduced — llama.cpp's chat.cpp does not match it, so tool "
+        "calls render as text and tool_calls comes back empty"
+    )
 
 
 def test_qwen3_uses_distinct_open_and_close():

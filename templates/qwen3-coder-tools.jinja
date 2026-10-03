@@ -68,9 +68,13 @@
 {%- for tool in tools %}
 {{- "\n" }}
 {%- set fn = tool.function if tool.function is defined else tool -%}
-{"type": "function", "function": {"name": {{ fn.name | tojson }}, "description": {{ (fn.description | default('')) | tojson }}, "parameters": {{ (fn.parameters | default({})) | tojson }}}}
+{%- set p = {} -%}
+{%- if fn.parameters is defined and fn.parameters -%}{%- set p = fn.parameters -%}{%- endif -%}
+{%- set d = "" -%}
+{%- if fn.description is defined and fn.description -%}{%- set d = fn.description -%}{%- endif -%}
+{"type": "function", "function": {"name": {{ fn.name | tojson }}, "description": {{ d | tojson }}, "parameters": {{ p | tojson }}}}
 {%- endfor %}
-{{- "\n</tools>\n\nIf you call a function, reply ONLY in this exact format:\n<​tool_call>\n{\"name\": <function-name>, \"arguments\": <args-json-object>}\n</​tool_call><|im_end|>\n" }}
+{{- "\n</tools>\n\nIf you call a function, reply ONLY in this exact format:\n<tool_call>\n{\"name\": <function-name>, \"arguments\": <args-json-object>}\n</tool_call><|im_end|>\n" }}
 {%- else -%}
 {%- if system_content -%}
 {{- '<|im_start|>system\n' + system_content + '<|im_end|>\n' }}
@@ -88,7 +92,7 @@
 {%- set assistant_text = '' -%}
 {%- if message.content is string -%}
 {%- set assistant_text = message.content -%}
-{%- elif message.content is sequence -%}
+{%- elif message.content is sequence and message.content is not string -%}
 {%- for block in message.content -%}
 {%- if block is mapping and block.get('type') == 'text' -%}
 {%- set assistant_text = assistant_text + block.get('text', '') -%}
@@ -102,16 +106,16 @@
 {%- if tool_call.function is defined -%}
 {%- set tool_call = tool_call.function -%}
 {%- endif -%}
-{{- '\n<​tool_call>\n' }}
+{{- '\n<tool_call>\n' }}
 {{- call(tool_call.name, tool_call.arguments) }}
-{{- '</​tool_call>' }}
+{{- '</tool_call>' }}
 {%- endfor -%}
-{%- if message.content is sequence -%}
+{%- if message.content is sequence and message.content is not string -%}
 {%- for block in message.content -%}
 {%- if block is mapping and block.get('type') == 'tool_use' -%}
-{{- '\n<​tool_call>\n' }}
+{{- '\n<tool_call>\n' }}
 {{- call(block.get('name'), block.get('input')) }}
-{{- '</​tool_call>' }}
+{{- '</tool_call>' }}
 {%- endif -%}
 {%- endfor -%}
 {%- endif -%}

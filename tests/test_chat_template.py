@@ -22,7 +22,9 @@ TEMPLATES = pathlib.Path(__file__).resolve().parents[1] / "templates"
 # teach the same one or the model emits tool calls as plain text.
 FAMILIES = {
     "qwen25-coder-tools.jinja": ("<|tool_call|>", "<|tool_call|>"),
-    "qwen3-coder-tools.jinja": ("<" + ZWSP + "tool_call>", "</" + ZWSP + "tool_call>"),
+    # plain markers: llama.cpp's chat.cpp matches these exact bytes and has no
+    # ZWSP anywhere, so a zero-width space here breaks tool-call parsing
+    "qwen3-coder-tools.jinja": ("<tool_call>", "</tool_call>"),
 }
 
 CURRENT = "qwen25-coder-tools.jinja"
