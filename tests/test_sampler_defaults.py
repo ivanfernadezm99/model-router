@@ -66,10 +66,21 @@ PLAIN_CODE = {"messages": [{"role": "user", "content": "def suma(a, b):\n    ret
 # --- rule 1: never override the client ---
 
 
-@pytest.mark.parametrize("key,value", [("temperature", 0.9), ("top_p", 0.95), ("top_k", 40), ("repeat_penalty", 1.0), ("dry_multiplier", 0.7)])
+@pytest.mark.parametrize("key,value", [("temperature", 0.9), ("top_p", 0.95), ("top_k", 40), ("repeat_penalty", 1.2), ("dry_multiplier", 0.7)])
 def test_client_sampling_is_never_overridden(key, value):
     out = asyncio_run(_sent_body({**PLAIN_CODE, key: value}))
     assert out[key] == value, f"{key} was overwritten to {out[key]}"
+
+
+def test_explicit_disabled_repeat_penalty_gets_floor_on_agent():
+    """repeat_penalty 1.0 means disabled — never intentional, gets the floor."""
+    out = asyncio_run(_sent_body({**AGENT, "repeat_penalty": 1.0}))
+    assert out["repeat_penalty"] == 1.05
+
+
+def test_explicit_disabled_repeat_penalty_gets_floor_on_code():
+    out = asyncio_run(_sent_body({**PLAIN_CODE, "repeat_penalty": 1.0}))
+    assert out["repeat_penalty"] == 1.15
 
 
 def test_client_explicit_top_p_high_survives():

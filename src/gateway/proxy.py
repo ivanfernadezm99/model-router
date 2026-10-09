@@ -119,6 +119,15 @@ async def proxy_request(request: Request, target_port: int, retry_after: int | N
                         parsed[key] = value
                         patched[key] = value
 
+                # An explicit repeat_penalty of 1.0 means "disabled" — virtually
+                # never intentional from an agent client, and it leaves the
+                # model with no repetition control at all. Treat it as absent
+                # so the floor below applies. Any other explicit value keeps
+                # rule 1 absolute: it is respected untouched.
+                if parsed.get("repeat_penalty") == 1.0:
+                    del parsed["repeat_penalty"]
+                    patched["repeat_penalty_from_disabled_1.0"] = True
+
                 # --- repetition control ---
                 # Agent output is paths and JSON: mild penalty, wide window.
                 # Non-agent code keeps the stronger penalty that killed the loop.
