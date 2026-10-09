@@ -69,8 +69,8 @@ def test_jobs_image_enqueues_and_completes_with_mocked_switch(tmp_path):
         body = c.get(f"/jobs/{job_id}").json()
         # with mocked switch_to True, should be completed
         assert body["status"] == "completed"
-        assert body["result"]["target"] == "sdxl"
-        mock_orch.switch_to.assert_called_with("sdxl")
+        assert body["result"]["target"] == "qwen-image"
+        mock_orch.switch_to.assert_called_with("qwen-image")
 
 
 def test_jobs_video_enqueues_and_completes(tmp_path):
@@ -118,7 +118,7 @@ def test_jobs_not_for_llm_documented():
     assert r.status_code in (404, 405)
     # /v1 with default code works (mocked)
     with patch("src.gateway.metrics.get_vram_used_mb", return_value=1000):
-        with patch("src.orchestrator.health.poll_health", new_callable=AsyncMock, return_value=True):
+        with patch("src.orchestrator.lifecycle.poll_health", new_callable=AsyncMock, return_value=True):
             with patch("src.orchestrator.lifecycle._run_systemctl") as mock_ctl:
                 mock_ctl.return_value = MagicMock(returncode=0, stdout="")
                 with patch("src.orchestrator.lifecycle.get_vram_used_mb", return_value=1000):
@@ -132,3 +132,39 @@ def test_jobs_not_for_llm_documented():
                                 r = c.post("/v1/chat/completions", json={"prompt": "hello"})
                                 # may be 200 or 202 depending on lock, but not 404/502
                                 assert r.status_code in (200, 202)
+
+
+def test_get_orchestrator_prefers_served_main_instance():
+    """Regresión 2026-10-07: doble import (__main__ vs src.gateway.app) daba dos
+    orchestrators — /health decía coder y /jobs/models/list qwen-image."""
+    import sys
+    from unittest.mock import MagicMock
+    from src.jobs import worker as worker_mod
+    fake_main = MagicMock()
+    fake_main.orchestrator = MagicMock()
+    fake_main.registry = MagicMock()
+    real_main = sys.modules.get("__main__")
+    sys.modules["__main__"] = fake_main
+    try:
+        orch, reg = worker_mod._get_orchestrator()
+        assert orch is fake_main.orchestrator
+        assert reg is fake_main.registry
+    finally:
+        if real_main is not None:
+            sys.modules["__main__"] = real_main
+
+
+def test_get_orchestrator_falls_back_without_main_attrs():
+    import sys
+    from unittest.mock import MagicMock
+    from src.jobs import worker as worker_mod
+    from src.gateway import app as app_mod
+    real_main = sys.modules.get("__main__")
+    sys.modules["__main__"] = MagicMock(spec=[])  # sin orchestrator/registry
+    try:
+        orch, reg = worker_mod._get_orchestrator()
+        assert orch is app_mod.orchestrator
+        assert reg is app_mod.registry
+    finally:
+        if real_main is not None:
+            sys.modules["__main__"] = real_main

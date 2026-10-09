@@ -175,3 +175,33 @@ def test_lifespan_starts_clean():
     with patch("src.gateway.app.reconcile_until_ready", _fast):
         with TestClient(app) as c:
             assert c.get("/health").status_code == 200
+
+
+def test_drop_stale_active_clears_dead_unit():
+    """Unidad muerta en memoria se limpia (caso 2026-10-06: coder en memoria,
+    parado por switch a vision → 502 al 8082 vacío)."""
+    from src.gateway.adopt import drop_stale_active
+    from unittest.mock import MagicMock, patch
+    from src.orchestrator.lifecycle import Orchestrator
+    reg = MagicMock()
+    reg.models = {"coder-30b-150k": {"service": "llama-code-30b-150k.service", "port": 8082}}
+    orc = Orchestrator(registry=reg)
+    orc.active_model = "coder-30b-150k"
+    orc.active_service = "llama-code-30b-150k.service"
+    with patch("src.gateway.adopt.systemd_active", return_value=False):
+        assert drop_stale_active(orc, reg) is True
+    assert orc.active_model is None
+
+
+def test_drop_stale_active_keeps_live_unit():
+    from src.gateway.adopt import drop_stale_active
+    from unittest.mock import MagicMock, patch
+    from src.orchestrator.lifecycle import Orchestrator
+    reg = MagicMock()
+    reg.models = {"vision-7b": {"service": "llama-vision-7b.service", "port": 8083}}
+    orc = Orchestrator(registry=reg)
+    orc.active_model = "vision-7b"
+    orc.active_service = "llama-vision-7b.service"
+    with patch("src.gateway.adopt.systemd_active", return_value=True):
+        assert drop_stale_active(orc, reg) is False
+    assert orc.active_model == "vision-7b"

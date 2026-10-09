@@ -123,6 +123,71 @@ async def reconcile_active_model(orchestrator, registry) -> str | None:
     return found["name"]
 
 
+def drop_stale_active(orchestrator, registry) -> bool:
+    """Suelta un active_model rancio: su unidad systemd ya no está activa.
+
+    Caso 2026-10-06: la memoria decía coder-30b-150k (parado por el switch a
+    vision) y cada chat iba por coder_passthrough al 8082 muerto → 502,
+    aunque vision-7b estaba sano en 8083. Solo actúa si no hay swap en curso
+    (lock libre y switching_to None) para no pisar un switch a mitad de camino.
+    Retorna True si limpió.
+    """
+    active = orchestrator.active_model
+    if active is None:
+        return False
+    try:
+        if getattr(orchestrator.lock, "locked", lambda: False)():
+            return False
+    except Exception:
+        pass
+    if getattr(orchestrator, "switching_to", None) is not None:
+        return False
+    try:
+        models = getattr(registry, "models", {}) or {}
+        spec = models.get(active) or {}
+        service = spec.get("service") or getattr(orchestrator, "active_service", None)
+        if service and systemd_active(service):
+            return False
+    except Exception:
+        return False
+    logger.warning(
+        "adopt: drop stale active_model=%s service=%s — unidad muerta, se re-adopta",
+        active, service,
+    )
+    orchestrator.active_model = None
+    orchestrator.active_service = None
+    return True
+
+
+async def active_unit_names(registry, timeout_s: float = 6.0) -> list[str]:
+    """Nombres del registry con unidad systemd activa. Best-effort para el
+    mensaje del 409: si el gateway dice 'no hay modelo' pero systemd tiene
+    uno arriba, el usuario lo ve en el error en vez de adivinar."""
+    import asyncio as _asyncio
+
+    def _list() -> list[str]:
+        try:
+            r = subprocess.run(
+                ["systemctl", "--user", "list-units", "--type=service",
+                 "--state=running", "--no-legend", "--no-pager"],
+                capture_output=True, text=True, timeout=timeout_s,
+                env=_systemd_env(),
+            )
+        except Exception:
+            return []
+        running = {line.split()[0] for line in (r.stdout or "").splitlines() if line.split()}
+        out = []
+        for name, spec in (getattr(registry, "models", {}) or {}).items():
+            if (spec or {}).get("service") in running:
+                out.append(name)
+        return out
+
+    try:
+        return await _asyncio.wait_for(_asyncio.to_thread(_list), timeout_s + 2)
+    except Exception:
+        return []
+
+
 async def reconcile_until_ready(orchestrator, registry, deadline_s: float = 300.0, interval_s: float = 5.0) -> str | None:
     """Keep retrying adoption until a model answers or the deadline passes.
 

@@ -76,3 +76,11 @@ journalctl --user -u model-router-gateway.service -o cat | grep sampler_patch
 - **Router:** tarea `vision` o header `X-Model-Hint: vision` → gateway :8000 → :8083
 - **Uso:** `curl -s http://127.0.0.1:8000/v1/chat/completions -H "X-Model-Hint: vision" -d '{"messages":[{"role":"user","content":"Describe esta imagen en markdown"}],"stream":false}'`
 - **Correr solo:** `systemctl --user start llama-vision-7b.service`
+
+## ✏️ Edición de imagen — Qwen-Image-Edit-2511 Q4 (experimental, NO en combo)
+
+- **Pesos:** `~/ComfyUI/models/diffusion_models/qwen-image-edit-2511-Q4_K_M.gguf` (13.2GB, unsloth) + `text_encoders/qwen_2.5_vl_7b_fp8_scaled.safetensors` (9.4GB) + `vae/qwen_image_vae.safetensors`. Todo junto en `models/`, sin duplicados.
+- **Servicio:** mismo `sdxl.service` (:8188, ComfyUI 0.34.0 + nodo ComfyUI-GGUF, requiere `pip install gguf` en el venv).
+- **Workflow:** `~/ComfyUI/user/default/workflows/qwen-image-edit-menu-test.json` (vía API `:8188/prompt`).
+- **Test 2026-10-07 (NUEVOMENU.png, 52 precios):** layout preservado, varios precios OK, PERO texto deformado en partes, 1 precio mal y numeración corrida. **No apto para producción; no exponer en el front todavía.**
+- **Próximo paso:** reintentar por secciones (menos cambios por pasada) o evaluar FLUX.1-Kontext.

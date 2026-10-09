@@ -11,7 +11,7 @@ import httpx
 
 from src.common.notify import notify_error
 from src.common.validation import holds_ok, validate_np
-from src.orchestrator.health import HARD_TIMEOUT_S, POLL_INTERVAL_S, poll_health
+from src.orchestrator.health import HARD_TIMEOUT_S, POLL_INTERVAL_S, poll_health, wait_http_200
 from src.orchestrator.vram import check_vram_for_model, get_vram_used_mb
 
 logger = logging.getLogger(__name__)
@@ -72,7 +72,14 @@ _SYSTEMCTL_ENV = {
 }
 
 
-def _run_systemctl(action: str, service: str) -> subprocess.CompletedProcess:
+# systemctl puede tardar: un wan-video de 13GB necesita ~2min solo para
+# morir (TimeoutStopSec=120), y un `start` se encola detrás de un `stop` en
+# curso. 15s fijos mataban el switch y el job (2026-10-05: video falló con
+# "systemctl start wan-video.service timed out after 15 seconds").
+_SYSTEMCTL_TIMEOUTS = {"stop": 150, "start": 60, "is-active": 10}
+
+
+def _run_systemctl(action: str, service: str, timeout: float | None = None) -> subprocess.CompletedProcess:
     _validate_service(service)
     if action not in ("stop", "start", "is-active"):
         raise ValueError(f"invalid action {action}")
@@ -82,9 +89,18 @@ def _run_systemctl(action: str, service: str) -> subprocess.CompletedProcess:
         ["systemctl", "--user", action, service],
         capture_output=True,
         text=True,
-        timeout=15,
+        timeout=_SYSTEMCTL_TIMEOUTS[action] if timeout is None else timeout,
         env=env,
     )
+
+
+async def _run_systemctl_async(
+    action: str, service: str, timeout: float | None = None
+) -> subprocess.CompletedProcess:
+    """Versión no-bloqueante: systemctl puede tardar 150s y el loop de
+    uvicorn debe seguir respondiendo /jobs/switch (202) y /health mientras
+    tanto. Sin esto, el front ve 'Read timed out' aunque el switch avance."""
+    return await asyncio.to_thread(_run_systemctl, action, service, timeout)
 
 
 def _port_occupant_pids(port: int) -> list[dict]:
@@ -211,7 +227,7 @@ class Orchestrator:
 
     async def stop_current(self) -> None:
         if self.active_service:
-            _run_systemctl("stop", self.active_service)
+            await _run_systemctl_async("stop", self.active_service)
             # poll VRAM until <2GB or short grace (best-effort, not blocking health)
             for _ in range(5):
                 used = get_vram_used_mb()
@@ -249,6 +265,34 @@ class Orchestrator:
                 self.active_model, self.active_service,
             )
 
+            # Adoptar en vivo antes de tocar nada: si el servicio del target
+            # ya está activo Y su health responde, no hay nada que switchear.
+            # Esto cubre la amnesia post-restart del gateway (active_model=None
+            # en memoria aunque el modelo siga sano arriba) y evita el caso
+            # 2026-10-05: parar un wan-14b sano para "cargar" wan-14b y que el
+            # stop de 13GB mate el job por timeout.
+            if target != self.active_model:
+                try:
+                    is_active = await _run_systemctl_async("is-active", spec["service"])
+                    if is_active.returncode == 0:
+                        port = int(spec["port"])
+                        # poll_health exige loaded:true en wan (no basta un 200
+                        # con loaded:false); 30s alcanzan si ya está cargado.
+                        if await poll_health(port, spec["health_endpoint"], timeout_s=30):
+                            logger.warning(
+                                "SWITCH-ADOPT target=%s service=%s port=%s sano — sin restart",
+                                target, spec.get("service"), port,
+                            )
+                            self.active_model = target
+                            self.active_service = spec["service"]
+                            return True
+                        logger.warning(
+                            "SWITCH-ADOPT-FAILED target=%s service activo pero health no responde — switch completo",
+                            target,
+                        )
+                except Exception as exc:
+                    logger.warning("SWITCH-ADOPT-PROBE-FAILED target=%s err=%s", target, exc)
+
             if not self._check_holds(target):
                 logger.warning(
                     "SWITCH-BLOCKED-HOLDS target=%s active_model=%s", target, self.active_model,
@@ -277,18 +321,21 @@ class Orchestrator:
                     return True
 
                 port = int(spec["port"])
-                # stop everything known on this port (active service + same-port
-                # siblings + target itself if a previous attempt left it running).
-                # Sin esto, un server viejo ocupa el puerto, el health le da OK
-                # al impostor y el switch miente "cargado OK".
-                to_stop = {spec["service"]}
+                # EXCLUSIVO TOTAL (política 2026-10-09): al cargar un modelo se
+                # paran TODOS los demás servicios del registry, sin importar
+                # el puerto. Solo queda arriba el pedido. Sin esto, un ComfyUI
+                # olvidado en :8188 comía 5GB y el siguiente switch moría con
+                # "failed to fit params to free device memory".
+                to_stop = set()
                 if self.active_service:
                     to_stop.add(self.active_service)
                 same_port: list[str] = []
                 for _name, _spec in (self.registry.models or {}).items():
                     try:
+                        svc = _spec.get("service")
+                        if svc and svc != spec["service"]:
+                            to_stop.add(svc)
                         if int(_spec.get("port")) == port:
-                            to_stop.add(_spec["service"])
                             same_port.append(_name)
                     except Exception:
                         continue
@@ -301,7 +348,7 @@ class Orchestrator:
                 )
                 for svc in sorted(to_stop):
                     try:
-                        _run_systemctl("stop", svc)
+                        await _run_systemctl_async("stop", svc)
                     except Exception as exc:
                         logger.warning("stop failed svc=%s err=%s", svc, exc)
                 # wait VRAM reclaim briefly
@@ -346,7 +393,30 @@ class Orchestrator:
                         notify_error(f"Switch falló: modelo excede 24GB", f"target={target} needed={spec['vram_mb']}MB")
                         return False
 
-                _run_systemctl("start", spec["service"])
+                await _run_systemctl_async("start", spec["service"])
+
+                # Warmup ANTES del health gate para servicios lazy (wan, echomimic):
+                # solo ponen loaded:true tras POST /load, y poll_health exige
+                # loaded:true. Sin este trigger, el switch espera hasta el hard
+                # timeout (deadlock 2026-10-04: wan-14b en "switching" 20min).
+                # Los LLM (llama.cpp) cargan en el start, asi que se saltean.
+                # Best-effort: si el warmup falla por lo que sea, poll_health
+                # abajo sigue siendo la autoridad que aprueba o voltea el switch.
+                if not target.startswith("coder"):
+                    try:
+                        if await wait_http_200(port, spec["health_endpoint"], timeout_s=180):
+                            try:
+                                async with httpx.AsyncClient(timeout=1200) as client:
+                                    load_resp = await client.post(f"http://127.0.0.1:{port}/load")
+                                    if load_resp.status_code == 200:
+                                        logger.warning("warmup loaded target=%s", target)
+                                    else:
+                                        logger.warning("warmup non-200 target=%s status=%s", target, load_resp.status_code)
+                            except Exception as exc:
+                                logger.warning("warmup call failed target=%s err=%s", target, exc)
+                        # si ni el HTTP levanta, poll_health lo reporta abajo igual
+                    except Exception as exc:
+                        logger.warning("warmup gate failed target=%s err=%s", target, exc)
 
                 ok = await poll_health(spec["port"], spec["health_endpoint"], timeout_s=HARD_TIMEOUT_S)
                 if not ok:
@@ -354,24 +424,10 @@ class Orchestrator:
                     logger.warning("health timeout target=%s", target)
                     notify_error(f"Switch timeout: {target}", f"health {spec['port']}{spec['health_endpoint']} no respondió en {HARD_TIMEOUT_S}s — modelo no cargó")
                     try:
-                        _run_systemctl("stop", spec["service"])
+                        await _run_systemctl_async("stop", spec["service"])
                     except Exception:
                         pass
                     return False
-
-                # For non-LLM services (echomimic, etc.) that have /load endpoint:
-                # call /load to actually load model into VRAM after health check passes.
-                # LLM services (llama.cpp) load at startup, so skip.
-                if not target.startswith("coder"):
-                    try:
-                        async with httpx.AsyncClient(timeout=1200) as client:
-                            load_resp = await client.post(f"http://127.0.0.1:{port}/load")
-                            if load_resp.status_code == 200:
-                                logger.info("model loaded into VRAM target=%s", target)
-                            else:
-                                logger.warning("load failed target=%s status=%s", target, load_resp.status_code)
-                    except Exception as exc:
-                        logger.warning("load call failed target=%s err=%s", target, exc)
 
                 # verificar que el que responde es el nuestro (n_ctx del /props
                 # contra el -c del registry). Sin esto, un server viejo con el
@@ -383,7 +439,7 @@ class Orchestrator:
                         logger.warning("props unreadable port=%s target=%s", port, target)
                         notify_error(f"Switch falló: /props no responde", f"target={target} port={port} — no se pudo verificar n_ctx")
                         try:
-                            _run_systemctl("stop", spec["service"])
+                            await _run_systemctl_async("stop", spec["service"])
                         except Exception:
                             pass
                         return False
@@ -391,7 +447,7 @@ class Orchestrator:
                         logger.warning("n_ctx mismatch port=%s want=%s got=%s", port, want, got)
                         notify_error(f"Switch falló: n_ctx mismatch", f"target={target} want={want} got={got} — modelo equivocado en puerto {port}")
                         try:
-                            _run_systemctl("stop", spec["service"])
+                            await _run_systemctl_async("stop", spec["service"])
                         except Exception:
                             pass
                         return False

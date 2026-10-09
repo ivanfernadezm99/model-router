@@ -118,7 +118,7 @@ async def test_lock_coalescence_5_to_1():
 
     start_calls = []
 
-    def fake_run(action, service):
+    def fake_run(action, service, timeout=None):
         # _run_systemctl(action, service) — shell=False enforced internally
         assert action in ("stop", "start")
         assert service.endswith(".service")
@@ -135,7 +135,8 @@ async def test_lock_coalescence_5_to_1():
                 with patch("src.orchestrator.lifecycle.holds_ok", return_value=(True, True)):
                     with patch("src.orchestrator.lifecycle.poll_health", new_callable=AsyncMock) as mock_poll:
                         mock_poll.return_value = True
-                        results = await asyncio.gather(*(orch.switch_to("sdxl") for _ in range(5)))
+                        with patch("src.orchestrator.lifecycle.wait_http_200", new_callable=AsyncMock, return_value=True):
+                            results = await asyncio.gather(*(orch.switch_to("sdxl") for _ in range(5)))
                         # All should return True, but only one start call
                         assert all(results)
                         assert len(start_calls) == 1
@@ -168,7 +169,7 @@ async def test_exclusive_stop_before_start():
 
     order = []
 
-    def fake_run(action, service):
+    def fake_run(action, service, timeout=None):
         assert action in ("stop", "start"), "shell=False — action allowlisted"
         assert service.endswith(".service")
         order.append(action + ":" + service)
@@ -182,13 +183,15 @@ async def test_exclusive_stop_before_start():
             with patch("src.orchestrator.lifecycle.check_vram_for_model", return_value=(True, 500)):
                 with patch("src.orchestrator.lifecycle.holds_ok", return_value=(True, True)):
                     with patch("src.orchestrator.lifecycle.poll_health", new_callable=AsyncMock, return_value=True):
-                        ok = await orch.switch_to("sdxl")
-                        assert ok is True
-                        # stop-before-start + misma-puerto: frena activo y
-                        # re-frena el propio target por si quedó de un intento previo
+                        with patch("src.orchestrator.lifecycle.wait_http_200", new_callable=AsyncMock, return_value=True):
+                            ok = await orch.switch_to("sdxl")
+                            assert ok is True
+                        # exclusivo total: frena todo lo demás (activo) y al
+                        # target NO se lo toca (si está sano lo adopta; si no,
+                        # arranca directo). Solo queda arriba el pedido.
                         assert order[0] == "stop:llama-code-q4.service"
-                        assert order[1] == "stop:sdxl.service"
-                        assert order[2] == "start:sdxl.service"
+                        assert "stop:sdxl.service" not in order
+                        assert order[-1] == "start:sdxl.service"
 
 
 @pytest.mark.asyncio
@@ -217,8 +220,9 @@ async def test_orphan_port_occupant_killed():
                             side_effect=[False, True],
                         ):
                             with patch("src.orchestrator.lifecycle._kill_port_occupants", return_value=True) as killer:
-                                ok = await orch.switch_to("sdxl")
-                                assert ok is True
+                                with patch("src.orchestrator.lifecycle.wait_http_200", new_callable=AsyncMock, return_value=True):
+                                    ok = await orch.switch_to("sdxl")
+                                    assert ok is True
                                 # La llamada ahora lleva contexto para que un
                                 # SIGKILL de `fuser -k` sea atribuible: puerto
                                 # posicional + target/active/shared/reason.
@@ -244,7 +248,7 @@ async def test_health_timeout_triggers_rollback():
 
     calls = []
 
-    def fake_run(action, service):
+    def fake_run(action, service, timeout=None):
         calls.append(action)
         m = MagicMock()
         m.returncode = 0
@@ -255,8 +259,9 @@ async def test_health_timeout_triggers_rollback():
             with patch("src.orchestrator.lifecycle.check_vram_for_model", return_value=(True, 1000)):
                 with patch("src.orchestrator.lifecycle.holds_ok", return_value=(True, True)):
                     with patch("src.orchestrator.lifecycle.poll_health", new_callable=AsyncMock, return_value=False):
-                        ok = await orch.switch_to("sdxl")
-                        assert ok is False
+                        with patch("src.orchestrator.lifecycle.wait_http_200", new_callable=AsyncMock, return_value=True):
+                            ok = await orch.switch_to("sdxl")
+                            assert ok is False
                         # start then stop rollback
                         assert "start" in calls
                         assert calls.count("stop") >= 1

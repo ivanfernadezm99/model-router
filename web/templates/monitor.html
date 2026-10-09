@@ -85,7 +85,7 @@
             const cls = job.status === 'running' ? 'running' :
                        job.status === 'completed' ? 'completed' :
                        job.status === 'failed' ? 'failed' : 'pending';
-            html += `<div class="queue-item ${cls}">${job.job_id.substring(0,8)}... - ${job.target || '?'} - ${job.status || '?'}</div>`;
+            html += `<div class="queue-item ${cls}">${String(job.job_id || job.id || '?').substring(0,8)}... - ${job.target || '?'} - ${job.status || '?'}</div>`;
           });
           queueList.innerHTML = html;
         } else {

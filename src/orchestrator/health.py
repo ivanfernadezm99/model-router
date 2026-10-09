@@ -57,6 +57,40 @@ async def poll_health(
             await asyncio.sleep(min(interval_s, remaining))
 
 
+async def wait_http_200(
+    port: int,
+    endpoint: str,
+    timeout_s: float = 180.0,
+    interval_s: float = POLL_INTERVAL_S,
+) -> bool:
+    """True en el primer HTTP 200, sin mirar el body.
+
+    Para servicios lazy (wan): el proceso responde 200 con loaded:false desde
+    el segundo 1, y loaded:true solo llega tras disparar el warmup (/load).
+    Este gate confirma "proceso vivo" para poder dispararlo; poll_health
+    (que exige loaded:true) corre despues.
+    """
+    validate_health(endpoint, port)
+    url = f"http://127.0.0.1:{port}{endpoint}"
+    deadline = asyncio.get_event_loop().time() + timeout_s
+
+    async with httpx.AsyncClient(timeout=5.0) as client:
+        while True:
+            if asyncio.get_event_loop().time() >= deadline:
+                logger.warning("wait_http_200 timeout url=%s timeout=%s", url, timeout_s)
+                return False
+            try:
+                resp = await client.get(url)
+                if resp.status_code == 200:
+                    return True
+            except Exception as exc:
+                logger.debug("wait_http_200 error url=%s err=%s", url, exc)
+            remaining = deadline - asyncio.get_event_loop().time()
+            if remaining <= 0:
+                return False
+            await asyncio.sleep(min(interval_s, remaining))
+
+
 def is_ready_status(status_code: int) -> bool:
     """True when the service reports ready. 503 = still loading (not a failure)."""
     return status_code == 200

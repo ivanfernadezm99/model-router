@@ -246,7 +246,9 @@ def test_auto_switch_disabled_refuses_mismatched_task_with_409(monkeypatch):
     app_mod.orchestrator.active_model = "coder-30b-190k"
     try:
         c = TestClient(app_mod.app)
-        r = c.post("/v1/chat/completions", json={"messages": [{"role": "user", "content": "un gato"}]}, headers={"X-Model-Hint": "image"})
+        with patch("src.gateway.app.drop_stale_active", return_value=False):
+            with patch("src.gateway.app.reconcile_active_model", new_callable=AsyncMock, return_value="coder-30b-190k"):
+                r = c.post("/v1/chat/completions", json={"messages": [{"role": "user", "content": "un gato"}]}, headers={"X-Model-Hint": "image"})
     finally:
         app_mod.orchestrator.active_model = previous
     assert r.status_code == 409

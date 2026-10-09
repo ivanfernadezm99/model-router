@@ -38,7 +38,7 @@ class JobQueue:
             return None
         return json.loads(data)
 
-    def update_status(self, job_id: str, status: str, result: Any = None, error: Any = None) -> None:
+    def update_status(self, job_id: str, status: str, result: Any = None, error: Any = None, progress: Any = None) -> None:
         job = self.get(job_id)
         if job is None:
             raise KeyError(f"Job {job_id} not found")
@@ -48,6 +48,8 @@ class JobQueue:
             job["result"] = result
         if error is not None:
             job["error"] = error
+        if progress is not None:
+            job["progress"] = progress
         self.redis.setex(self._key(job_id), JOB_TTL_SECONDS, json.dumps(job))
 
     def mark_failed(self, job_id: str, error_msg: str = "video_backend_not_configured") -> None:

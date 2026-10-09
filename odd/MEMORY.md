@@ -237,3 +237,246 @@ pone active_service=None. Un test lo demostro. El riesgo real queda en
 
 **Geteo de la clave:** el OOM ya no es la hipotesis (kern.log sin eventos OOM,
 systemd-oomd inactive). El SIGKILL sigue sin causa cerrada.
+
+---
+
+## 2026-10-04 — RAM 31GiB confirmada, contexto 190K restaurado + timeouts opencode
+
+**Que:** usuario amplio RAM a 31GiB (`free -h` lo confirma: 31Gi total).
+Se levanto la mitigacion del 2026-10-03 y se restauro el contexto completo.
+
+**Archivos tocados (3):**
+1. `config.yaml` entrada `coder-30b-190k` — `-c`/`--ctx-size` 150000 -> 190000,
+   `vram_mb` 18000 -> 22000. Comment viejo del SIGKILL reemplazado por nota de
+   restauracion. `defaults.model` actualizado ("190K restaurado 2026-10-04").
+2. `~/.config/systemd/user/llama-code-30b-190k.service` — `ExecStart -c 150000`
+   -> `-c 190000` + `Description` actualizado. **OJO: el unit manda en runtime**
+   (el gateway hace `stop/start` via systemctl); cambiar solo `config.yaml` NO
+   aplica el contexto. `daemon-reload` + `restart`, `:8082/health` y `:8000/health`
+   en `ok`/`ready`.
+3. `~/.config/opencode/opencode.json` provider `llm-local` —
+   `timeout`/`chunkTimeout`/`headerTimeout` 600000 (10min) -> 1800000 (30min).
+   El `chunkTimeout` es el que cortaba con prompts de 100K+ (el primer token tarda
+   minutos con KV en RAM + YaRN alto).
+
+**Aprendido:** ante "cambie el contexto y no pasa nada", verificar el proceso
+corriendo (`ps aux | grep llama-server`) ademas del `config.yaml`. El registry es
+declarativo; la unidad systemd es la efectiva.
+
+## 2026-10-04 — Templates alineados: Qwen3 -> qwen3-coder-tools.jinja
+
+**Que:** las 6 entradas Qwen3 de `config.yaml` apuntaban al template del 2.5.
+Ahora usan `templates/qwen3-coder-tools.jinja`:
+`coder-30b-a3b`, `coder-30b-128k`, `coder-30b-150k`, `coder-30b-190k`,
+`coder-30b-q5-100k`, `qwen3-14b-190k`. `Registry.load()` ok.
+
+**No tocado a proposito:**
+- `coder-14b-*` (Qwen2.5) quedan con `qwen25-coder-tools.jinja` — es su template.
+- `qwen3-27b-flagship/xl` no tienen template explicito (usan el built-in del GGUF
+  via `--jinja`). Forzarles el template coder a un denso con reasoning es riesgoso.
+- El servicio corriendo YA usaba el template qwen3 (el unit estaba bien), asi que
+  no hizo falta reiniciar por esto.
+
+## 2026-10-04 — Fallo `doom_loop`: herramienta alucinada, no permisos
+
+**Que:** opencode bloqueo un tool call a `doom_loop` con reglas
+`allow * / ask doom_loop / deny *`. `doom_loop` no existe en el repo ni en
+`opencode.json` — el modelo lo invento y el sistema de permisos lo denego.
+Los permisos del usuario estan sanos.
+
+**Hipotesis:** YaRN 5.9x a 190K degrada el tool-calling del 30B (se pone creativo
+con nombres de herramientas). Alternativa: sesion contaminada por un loop previo.
+
+**Plan si se repite:** sesion fresca primero; si persiste, bajar a `coder-30b-a3b`
+(100K, YaRN 3.1x, tool-calling estable) y reservar el 190K para lectura masiva.
+
+## 2026-10-04 — RAM ocupada: son los 2 WhatsApp, no un leak
+
+**Que:** 23Gi usados de 31Gi. Top: chrome puppeteer ~9GB (2 renderers) +
+llama-server ~4.7GB (KV en RAM por `--no-kv-offload`) + Brave ~4GB (renderers
+desde el 29-sep) + `opencode web` ~1.7GB (desde el 29-sep).
+
+**Aprendido:** los renderers puppeteer son los 2 WhatsApp sincronizando
+(sesiones `openwa` del 01-oct) — uso legitimo, no apps mal lanzadas. Chrome
+headless con WhatsApp Web + dias de uptime come eso. Alivio facil: reiniciar
+Brave (3-4GB); alivio de fondo: `coder-30b-a3b` 100K todo en GPU (KV en VRAM).
+
+---
+
+## 2026-10-04 — APAGON :8082 10:39-12:26 por mi restart (643 crash-loops)
+
+**Que:** mi `systemctl --user restart llama-code-30b-190k.service` de las 10:39
+para aplicar el 190K dejo la unidad en crash-loop: `couldn't bind HTTP server
+socket, port 8082` -> exit(1) -> `Restart=always` cada 5s -> **643 restarts**
+hasta las 12:26. El puerto quedo ocupado por un proceso huerfano (el 150K
+anterior no libero a tiempo / quedo colgado) y el nuevo proceso nunca pudo
+bindear. A las 12:26, al levantar `llama-code-q4` (14B), el puerto se libero y
+el 190K quedo `inactive`. Un solo llama-server corriendo desde entonces.
+
+**Consecuencia:** las sesiones apply de multi-key (`sdd-apply` 10:47-11:04 y
+`general` 11:14-11:38, DB `opencode.db`) corrieron DURANTE el apagon. Los
+subagentes SI emitieron tool calls (16 y 25 parts `tool` en DB) pero el backend
+estaba muerto -> errores -> el modelo fabulo: snippets inventados
+(tipos SQL Server, `Id` en vez de `ZernioConfigurationId`), 1 solo archivo
+escrito (migracion de las 11:04) y plan devuelto en el chat. No fue el prompt
+(los dos prompts estan bien encarados) ni el Jinja.
+
+**Verificado que el Jinja del 2.5 esta SANO (mismo dia, post-apagon):**
+- `tests/test_template_minja.py`: 9 passed.
+- Probe vivo directo a :8082 con tools: `finish_reason=tool_calls`, path absoluto
+  intacto.
+- Probe vivo via gateway :8000: `finish_reason=tool_calls`.
+- Unidad q4 usa `%h/.../templates/qwen25-coder-tools.jinja` (el del repo, sin drift).
+
+**Aprendido:**
+1. Despues de CUALQUIER restart de una unidad llama, verificar el bind en el
+   journal (`couldn't bind`), no solo `is-active` ni `/health` (un 200 aislado
+   puede ser un falso positivo entre restarts).
+2. `Restart=always` + puerto ocupado = loop infinito silencioso. Considerar
+   `StartLimitBurst`/`StartLimitIntervalSec` en las unidades llama para que un
+   bind fallido no gire 2 horas.
+3. Ante "el subagente no escribe", antes de culpar al template: mirar parts en
+   `opencode.db` (si hay `tool` parts, el parseo anda) y el estado del backend
+   en la ventana horaria de la sesion (`journalctl --user -u <unidad>`).
+
+---
+
+## 2026-10-04 — Deadlock switch wan-14b: warmup /load antes del health gate
+
+**Que:** pedir wan-14b desde la web dejaba el switch en `switching` hasta el
+hard timeout (20min). Causa: `wan_server.py` es lazy (`loaded:false` hasta el
+primer `/generate`) pero `poll_health` exige `loaded:true`; y el POST /load
+que existia en `lifecycle.py` corria DESPUES del poll (nunca llegaba a
+ejecutarse). Ademas `wan_server.py` ni siquiera tenia endpoint `/load`
+(devolvia 404).
+
+**Fix (3 archivos + 1 test nuevo):**
+1. `~/Wan2.1/wan_server.py` — nuevo `POST /load`: llama `_get_pipe()` en
+   thread (`asyncio.to_thread`, el `/health` sigue respondiendo durante la
+   carga) y devuelve `{"loaded": true}`. Sirve a wan-14b (:8189) y wan-i2v
+   (:8191): misma app.
+2. `src/orchestrator/health.py` — nuevo `wait_http_200()`: gate liviano (solo
+   HTTP 200, sin mirar body) para confirmar "proceso vivo" antes de disparar
+   el warmup.
+3. `src/orchestrator/lifecycle.py` — `switch_to`: tras el start, para targets
+   no-`coder`, `wait_http_200` -> `POST /load` -> `poll_health`. Todo el bloque
+   warmup es best-effort con try/except: si falla, `poll_health` sigue siendo
+   la autoridad. Se elimino el bloque viejo post-poll (deadlock).
+4. `tests/test_wan_warmup.py` (nuevo, 4 tests): orden wait->warmup->poll,
+   coder saltea warmup, `wait_http_200` ignora `loaded:false`, timeout en 503.
+   + mocks de `wait_http_200` en 4 tests viejos de `test_orchestrator.py`
+   (sin eso colgaban contra red real: el gate nuevo es de verdad, no mock).
+
+**Suite:** 176 passed (solo `test_e2e_queue.py` excluido: necesita stack vivo).
+
+**Verificado en vivo:** switch a wan-14b completo 21:59->22:15 (`active`,
+`loaded:true`). OJO: la carga real tarda ~15min en este host (disco lento con
+65GB de pesos; el "30-60s" del log es optimista). El hard timeout de 1200s
+alcanza justo. No achicarlo.
+
+**Deuda:** `StartLimitBurst` en unidades llama (del apagon de las 10:39) sigue
+pendiente.
+
+---
+
+## 2026-10-04 — `substring` de undefined al pedir video (id vs job_id)
+
+**Que:** pedir video desde la web tiraba `Cannot read properties of undefined
+(reading 'substring')`. Causa: `POST /api/submit` devolvia `{"id": ...}`
+(clave del gateway) pero `index.html:306` lee `d.job_id` -> `undefined` ->
+`currentJob.substring()` revienta. (202 acepta `r.ok`, asi que pasaba el
+`throw` y explotaba en el render.)
+
+**Fix (3 archivos):**
+1. `web/app.py` `/api/submit` — devuelve `id` Y `job_id` (compat ambos).
+2. `web/templates/index.html` — `currentJob = d.job_id || d.id` + guard con
+   error legible si falta (nunca mas TypeError crudo).
+3. `web/templates/monitor.html:88` — mismo crash con jobs del gateway
+   (`job.job_id` inexistente): `(job.job_id || job.id || '?')`.
+   (`index.html:355` ya estaba guardado con `(j.id || '?')`.)
+   Reiniciado `model-router-web.service` (Flask; templates no necesitan restart
+   pero `app.py` si). Verificado: `/api/submit` devuelve ambas claves.
+
+**Nota:** la verificacion encoló un job real de prueba ("test substring fix",
+`6431ce80`) detras del video del usuario — se va a generar igual (sin forma de
+cancelar: los jobs corren como BackgroundTasks in-process). Borrar el mp4
+resultante.
+
+---
+
+## 2026-10-04 — Videos fallados: OOM por default de 33 frames (fix: 17)
+
+**Que:** los dos jobs de video fallaron con `CUDA out of memory` (23.5GB
+usados, 8MB libres) en `self.model.to(self.device)` — el DiT entero sube a GPU
+de una. Causa: `src/jobs/worker.py` mandaba `num_frames=33` por default
+(video e i2v). El README ya documentaba 17 como maximo seguro en 3090
+("33 o 81 frames OOMean"), pero el worker no lo respetaba.
+
+**Fix:** defaults `33 -> 17` en `worker.py` (video + i2v) + comment con la
+evidencia del OOM. Tests jobs/gateway/batch: 27 passed. Reiniciado el gateway
+(el worker corre in-process). El wan sigue cargado (`loaded:true`), no hizo
+falta recargar 15min.
+
+**Ojo para el usuario:** "video con las palabras Enlaces Chaco" — Wan2.1 T2V
+no renderiza texto legible; las letras salen deformadas casi siempre. Si quiere
+texto exacto en el video, hay que componerlo encima despues (ffmpegetal).
+
+---
+
+## 2026-10-05 — Job videoZombie al 50%: race submit vs switch (sdxl mato a wan)
+
+**Que:** job `1ae9bdf1` quedo `running`/`progress:50` para siempre. Eso NO es
+"mitad renderizado": 50 es el default de enqueue; `updated_at == created_at`
+prueba que el worker nunca lo toco. Secuencia (mismo segundo):
+- 09:20:57.0 usuario pide video via web (worker arranca).
+- 09:20:57.x entra `SWITCH-BEGIN target=sdxl` (click en otro modelo).
+- 09:20:58 stop-before-start mata `wan-video` bajo los pies del worker.
+El worker quedo colgado contra backend muerto y nunca actualizo el estado.
+
+**Accion:** marcado `failed` a mano en Redis (`job:<id>`, `redis-py`, TTL 7d)
+con error explicativo. Sin endpoint de cancel (los jobs son BackgroundTasks
+in-process): no se puede cancelar limpio, solo marcar estado.
+
+**Deuda (real, de diseno):** el worker de `/jobs/*` NO pasa por el gate de
+exclusion contra switches concurrentes (ya anotado: `worker.py:115` y
+`router.py:200` llaman `switch_to()` directo). Un submit + un switch al mismo
+tiempo se pisan. Fix futuro: el worker deberia adoptar el modelo (si ya esta
+activo, no switch) o tomar el lock del orchestrator antes de postear
+/generate. Mientras tanto: NO tocar "Cargar" mientras un job corre.
+
+---
+
+## 2026-10-05 — Anti-zombies: worker finally + stale reap + cancel + aviso front
+
+**Que:** job `1ae9bdf1` quedo `running`/50% eterno (el 50 es default de
+enqueue, no progreso real). Capas del fix:
+1. `src/jobs/worker.py` — `except CancelledError`: marca failed("worker
+   detenido...") y re-raise (los BackgroundTasks morian en silencio en cada
+   restart). Guards pre-POST y pre-completed: si el job ya no esta activo
+   (cancelado), no genera y no pisa el failed del usuario. Heartbeat
+   `progress=60` al arrancar el backend (mueve `updated_at`, el front lo usa
+   para detectar stalls).
+2. `src/jobs/queue.py` — `update_status()` acepta `progress` opcional.
+3. `src/jobs/router.py` — `_is_stale`/`_reap_if_stale`: leer un job activo sin
+   moverse >45min (peor legitimo: switch 1200s + gen 1200s + margen) lo marca
+   failed con mensaje ("sin progreso... reenviá"). Aplicado en GET uno y GET
+   lista. Nuevo `DELETE /jobs/{id}`: cancela (failed "cancelado por el
+   usuario"; lo que ya este dentro del POST bloqueante igual termina pero se
+   descarta el resultado).
+4. `web/app.py` — proxy `DELETE /api/job/<id>`. `index.html` — `stallHtml()`:
+   job activo con `updated_at` de hace 12+ min muestra "sin progreso hace X
+   min". Boton ✖ en items activos + error visible en items failed.
+   `monitor.html` ya cubierto en el fix anterior.
+5. `tests/test_jobs_lifecycle.py` (nuevo, 6 tests): reap en GET y en lista,
+   fresh no tocado, cancel + doble cancel + 404, CancelledError->failed,
+   worker no revive pre-cancelados. **Suite: 182 passed.**
+
+**Verificado en vivo** (sin gastar GPU: jobs fabricados en Redis): stale 2h ->
+failed con mensaje al leerlo; fresh intacto; DELETE cancela; proxy UI OK.
+Claves de prueba borradas.
+
+**Hallazgo aparte (NO roto por mi):** `sdxl.service` (ComfyUI) no levanta:
+`No module named 'alembic'` + `No module named 'comfy_aimdo'` — drift de
+dependencias, crash-loop desde las 09:21. El switch a sdxl de las 09:20 tampoco
+iba a completar nunca. Fix: instalar deps en el venv de ComfyUI (pendiente,
+ofrecido al usuario). Pedir otro modelo frena el loop.

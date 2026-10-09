@@ -10,7 +10,12 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse, PlainTextResponse, Response
 
-from src.gateway.adopt import reconcile_active_model, reconcile_until_ready
+from src.gateway.adopt import (
+    active_unit_names,
+    drop_stale_active,
+    reconcile_active_model,
+    reconcile_until_ready,
+)
 from src.gateway.detector import detect_task, task_to_model
 from src.gateway.metrics import health_payload, metrics_text
 from src.gateway.proxy import proxy_request
@@ -100,6 +105,7 @@ async def debug_health():
 async def health():
     # A healthy port is not enough to name the model — thirteen coder models
     # share 8082 — so adoption goes through systemd unit state first.
+    drop_stale_active(orchestrator, registry)
     await reconcile_active_model(orchestrator, registry)
     return JSONResponse(health_payload(orchestrator, queue))
 
@@ -149,6 +155,11 @@ async def v1_proxy(path: str, request: Request):
     # idle touch on every /v1 request
     reaper.touch()
 
+    # la memoria puede estar rancia (unidad parada por un switch manual):
+    # sin esto, un coder muerto en memoria manda todo al 8082 vacío → 502.
+    drop_stale_active(orchestrator, registry)
+    await reconcile_active_model(orchestrator, registry)
+
     # if orchestrator has exclusive lock (swap in progress) -> enqueue 202
     if orchestrator.lock.locked() or queue.is_swapping():
         # if target matches swapping target, coalesce — single systemctl start already done by holder
@@ -178,12 +189,26 @@ async def v1_proxy(path: str, request: Request):
         except Exception:
             pass  # fall through to normal switch
 
+    # for code task: a vision model serves text chat too (llama-server VL).
+    # Sin esto, con vision-7b activo cada chat de opencode caía en 409/502
+    # aunque el modelo puede responder (verificado 2026-10-06 en :8083).
+    if task == "code" and orchestrator.active_model and orchestrator.active_model.startswith("vision"):
+        try:
+            active_spec = registry.resolve(orchestrator.active_model)
+            active_port = int(active_spec["port"])
+            resp = await proxy_request(request, active_port, task=task)
+            latency_ms = int((time.monotonic() - start) * 1000)
+            logger.info(json.dumps({"request_id": request_id, "hint": task, "target_model": target_model, "active_model": orchestrator.active_model, "queue_depth": queue.depth(), "latency_ms": latency_ms, "status": resp.status_code, "vision_passthrough": True}))
+            return resp
+        except Exception:
+            pass  # fall through to normal switch
+
     # if active is None but target port is already healthy (manual server), adopt it and proxy directly
     if orchestrator.active_model is None:
         try:
             from src.orchestrator.health import poll_health
 
-            is_healthy = await poll_health(target_port, registry.resolve(target_model)["health_endpoint"], timeout_s=2)
+            is_healthy = await poll_health(target_port, registry.resolve(target_model)["health_endpoint"], timeout_s=8)
             if is_healthy:
                 orchestrator.active_model = target_model
                 orchestrator.active_service = registry.resolve(target_model)["service"]
@@ -212,7 +237,7 @@ async def v1_proxy(path: str, request: Request):
             try:
                 from src.orchestrator.health import poll_health as _ph
                 _spec = registry.resolve(orchestrator.active_model)
-                if await _ph(int(_spec["port"]), _spec["health_endpoint"], timeout_s=3):
+                if await _ph(int(_spec["port"]), _spec["health_endpoint"], timeout_s=8):
                     resp = await proxy_request(request, int(_spec["port"]), task=task)
                     latency_ms = int((time.monotonic() - start) * 1000)
                     logger.info(json.dumps({"request_id": request_id, "hint": task, "target_model": target_model, "active_model": orchestrator.active_model, "queue_depth": queue.depth(), "latency_ms": latency_ms, "status": resp.status_code, "auto_switch": "disabled-passthrough"}))
@@ -220,8 +245,12 @@ async def v1_proxy(path: str, request: Request):
             except Exception:
                 pass
         latency_ms = int((time.monotonic() - start) * 1000)
-        logger.warning(json.dumps({"request_id": request_id, "hint": task, "target_model": target_model, "queue_depth": queue.depth(), "latency_ms": latency_ms, "error": "auto-switch disabled, no active model"}))
-        return JSONResponse({"error": "auto-switch disabled: cargá un modelo manualmente desde el front", "target": target_model}, status_code=409)
+        units_up = await active_unit_names(registry)
+        logger.warning(json.dumps({"request_id": request_id, "hint": task, "target_model": target_model, "queue_depth": queue.depth(), "latency_ms": latency_ms, "units_up": units_up, "error": "auto-switch disabled, no active model"}))
+        detail = "cargá un modelo manualmente desde el front"
+        if units_up:
+            detail += f" (systemd tiene arriba: {', '.join(units_up)} — probá de nuevo, el health tardó en responder)"
+        return JSONResponse({"error": f"auto-switch disabled: {detail}", "target": target_model, "units_up": units_up}, status_code=409)
     queue.set_swapping(target_model)
     try:
         ok = await orchestrator.switch_to(target_model)

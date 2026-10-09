@@ -1,9 +1,12 @@
 """Flask web interface - Model Router combo + monitor (mismo origen)."""
 import base64
+import logging
 import os
 
 import requests
 from flask import Flask, jsonify, render_template, request
+
+log = logging.getLogger("model-router-web")
 
 app = Flask(__name__)
 ROUTER_BASE = os.environ.get("ROUTER_BASE", "http://127.0.0.1:8000")
@@ -90,7 +93,8 @@ MODEL_DESCS = {
      "wan-14b": "Wan2.1-T2V-14B | difusión 14B | Texto → video desde cero. Solo prompt, sin archivo.",
      "wan-i2v-14b": "Wan2.1-I2V-14B-720P | difusión 14B | Foto o video → video animado (paneo/zoom cinematográfico). Lleva imagen + prompt.",
      "echomimic-v2": "EchoMimicV2 | difusión | Foto + audio → vos hablando (cara/torso sincronizado). Lleva imagen + audio + texto.",
-     "sdxl": "SDXL | difusión | Crear o mejorar fotos. Solo prompt para crear; foto + qué mejorar para editar.",
+     "sdxl": "SDXL | difusión | Legacy (reemplazado por qwen-image para fotos).",
+     "qwen-image": "🆕 NUEVO Qwen-Image 20B Q4 | FOTO FIJA publicitaria con texto (avisos, promos, carteles). Genera 1 imagen (~13 min). Distinto de video/i2v/avatar que generan VIDEO con movimiento.",
    }
 
 
@@ -155,7 +159,7 @@ def switch():
     if not model:
         return jsonify({"error": "falta model"}), 400
     try:
-        resp = requests.post(f"{ROUTER_BASE}/jobs/switch", json={"model": model}, timeout=15)
+        resp = requests.post(f"{ROUTER_BASE}/jobs/switch", json={"model": model}, timeout=30)
         if resp.status_code in (200, 202):
             return jsonify(resp.json()), 202
         return jsonify({"error": resp.text[:300]}), resp.status_code
@@ -230,6 +234,22 @@ def job_status(job_id):
         return jsonify({"id": job_id, "status": "unknown", "error": str(e)}), 502
 
 
+@app.route("/api/job/<job_id>", methods=["DELETE"])
+def job_cancel(job_id):
+    log.warning(
+        "AUDIT front-cancel job=%s remote=%s ua=%s",
+        job_id, request.remote_addr, (request.headers.get("User-Agent", "-"))[:120],
+    )
+    try:
+        resp = requests.delete(f"{ROUTER_BASE}/jobs/{job_id}", timeout=10)
+        try:
+            return jsonify(resp.json()), resp.status_code
+        except Exception:
+            return jsonify({"id": job_id, "error": resp.text[:200]}), resp.status_code
+    except Exception as e:
+        return jsonify({"id": job_id, "error": str(e)}), 502
+
+
 @app.route("/api/jobs/<job_id>/result")
 def job_result(job_id):
     try:
@@ -281,6 +301,43 @@ def _as_data_url(upload, default_mime="image/png"):
     return f"data:{mime};base64," + base64.b64encode(raw).decode("ascii")
 
 
+MAX_PATH_FILE_MB = 200
+
+
+def _data_url_from_path(path_str, default_mime="image/png"):
+    """Lee un archivo del disco del servidor (el front corre local).
+    Alternativa cuando el file picker del SO no entrega el archivo."""
+    import mimetypes
+    p = (path_str or "").strip()
+    if not p:
+        return None
+    if not os.path.isabs(p):
+        return None, "la ruta tiene que ser absoluta (ej: /home/servidor/Imágenes/foto.png)"
+    if not os.path.isfile(p):
+        return None, f"no existe o no es archivo: {p[:120]}"
+    size = os.path.getsize(p)
+    if size > MAX_PATH_FILE_MB * 1024 * 1024:
+        return None, f"archivo muy grande ({size // 1048576}MB, tope {MAX_PATH_FILE_MB}MB)"
+    try:
+        with open(p, "rb") as f:
+            raw = f.read()
+    except Exception as e:
+        return None, f"no se pudo leer: {e}"
+    if not raw:
+        return None, "archivo vacío"
+    mime = mimetypes.guess_type(p)[0] or default_mime
+    return f"data:{mime};base64," + base64.b64encode(raw).decode("ascii"), None
+
+
+def _data_url_or_path(upload, path_str, default_mime="image/png"):
+    """Upload gana; si no hay, ruta de disco. Retorna (data_url, error)."""
+    if upload is not None and getattr(upload, "filename", ""):
+        return _as_data_url(upload, default_mime), None
+    if (path_str or "").strip():
+        return _data_url_from_path(path_str, default_mime)
+    return None, None
+
+
 @app.route("/api/submit", methods=["POST"])
 def submit():
     model = (request.form.get("model") or "video").strip().lower()
@@ -293,30 +350,70 @@ def submit():
 
     endpoint = MODEL_ENDPOINTS[model]
     payload = {"prompt": prompt}
+    if model == "image":
+        # foto base opcional: el worker la usa como fondo + overlays (sin IA).
+        # A diferencia de i2v (que la anima a video), acá queda FIJA + textos.
+        bg, bg_err = _data_url_or_path(request.files.get("image"), request.form.get("image_path"))
+        if bg_err:
+            return jsonify({"error": f"foto: {bg_err}"}), 400
+        if bg:
+            payload["photo"] = bg
+    if model == "image":
+        ov_raw = request.form.get("overlays") or ""
+        if ov_raw.strip():
+            try:
+                import json as _json
+                ovs = _json.loads(ov_raw)
+                if isinstance(ovs, list) and ovs:
+                    payload["overlays"] = [
+                        {"slot": str(o.get("slot", "")), "text": str(o.get("text", ""))[:200]}
+                        for o in ovs if isinstance(o, dict) and o.get("text")
+                    ]
+            except Exception:
+                pass
+        if (request.form.get("restyle") or "").strip().lower() in ("true", "1", "on"):
+            payload["restyle"] = True
+        msg_raw = request.form.get("messages") or ""
+        if msg_raw.strip():
+            try:
+                import json as _json2
+                ms = _json2.loads(msg_raw)
+                if isinstance(ms, list) and ms:
+                    payload["messages"] = [
+                        {"who": str(x.get("who", "bot")), "text": str(x.get("text", ""))[:160]}
+                        for x in ms if isinstance(x, dict) and x.get("text")
+                    ][:12]
+            except Exception:
+                pass
     try:
         if model == "image":
             if quality not in ("draft", "balanced", "max"):
                 quality = "balanced"
             payload["quality"] = quality
         if model in ("i2v", "avatar"):
-            img = _as_data_url(request.files.get("image"))
+            img, img_err = _data_url_or_path(request.files.get("image"), request.form.get("image_path"))
+            if img_err:
+                return jsonify({"error": f"imagen: {img_err}"}), 400
             if img:
                 payload["image"] = img
             else:
-                return jsonify({"error": f"el modelo {model} requiere una imagen (adjuntá foto/video base)"}), 400
+                return jsonify({"error": f"el modelo {model} requiere una imagen (adjuntá foto/video base o pegá la ruta)"}), 400
         if model == "avatar":
-            aud = _as_data_url(request.files.get("audio"), default_mime="audio/wav")
+            aud, aud_err = _data_url_or_path(request.files.get("audio"), request.form.get("audio_path"), default_mime="audio/wav")
+            if aud_err:
+                return jsonify({"error": f"audio: {aud_err}"}), 400
             if aud:
                 payload["audio"] = aud
             else:
-                return jsonify({"error": "el modelo avatar requiere un audio (adjuntá tu voz)"}), 400
+                return jsonify({"error": "el modelo avatar requiere un audio (adjuntá tu voz o pegá la ruta)"}), 400
 
         # Visión: va por /v1/chat/completions con formato multimodal OpenAI
         if model == "vision":
-            img = request.files.get("image")
-            if not img:
-                return jsonify({"error": "el modelo visión requiere una imagen adjunta"}), 400
-            img_data = _as_data_url(img)
+            img_data, img_err = _data_url_or_path(request.files.get("image"), request.form.get("image_path"))
+            if img_err:
+                return jsonify({"error": f"imagen: {img_err}"}), 400
+            if not img_data:
+                return jsonify({"error": "el modelo visión requiere una imagen adjunta o su ruta"}), 400
             messages = [
                 {"role": "user", "content": [
                     {"type": "text", "text": prompt},
@@ -338,7 +435,9 @@ def submit():
         resp = requests.post(f"{ROUTER_BASE}/jobs/{endpoint}", json=payload, timeout=30)
         if resp.status_code in (200, 202):
             data = resp.json()
-            return jsonify({"id": data.get("id"), "target": model, "status": "queued"}), 202
+            # el gateway devuelve "id"; el frontend espera "job_id" (index.html).
+            # Se devuelven ambas claves para no romper ningun consumidor.
+            return jsonify({"id": data.get("id"), "job_id": data.get("id"), "target": model, "status": "queued"}), 202
         return jsonify({"error": resp.text[:500]}), resp.status_code
     except Exception as e:
         return jsonify({"error": str(e)}), 502

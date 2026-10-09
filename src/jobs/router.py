@@ -1,8 +1,9 @@
 import asyncio
 import logging
 import os
+from datetime import datetime, timezone
 
-from fastapi import APIRouter, BackgroundTasks, HTTPException
+from fastapi import APIRouter, BackgroundTasks, HTTPException, Request
 
 logger = logging.getLogger(__name__)
 from fastapi.responses import FileResponse
@@ -38,12 +39,31 @@ class AvatarJobRequest(BaseModel):
     image: str | None = None
     audio: str | None = None
 
+class OverlaySpec(BaseModel):
+    slot: constr(min_length=1)
+    text: constr(min_length=1)
+
+
+class ChatMsg(BaseModel):
+    who: constr(min_length=1) = "bot"
+    text: constr(min_length=1)
+
+
+OVERLAY_SLOTS = ("title", "subtitle", "contact", "brand")
+
+
 class ImageJobRequest(BaseModel):
     prompt: constr(min_length=1)
     quality: str = "balanced"
     width: int | None = None
     height: int | None = None
     steps: int | None = None
+    overlays: list[OverlaySpec] | None = None
+    messages: list[ChatMsg] | None = None
+    restyle: bool = False
+    # foto base opcional (data-url o jpg/png/webp): se usa como fondo tal cual
+    # + overlays encima. Sin edición por difusión (no es fiable para texto).
+    photo: str | None = None
 
 IMAGE_PRESETS = {
     "draft": {"width": 512, "height": 512, "steps": 20, "cfg": 5},
@@ -59,6 +79,40 @@ class JobStatusResponse(BaseModel):
     result: Any | None = None
     error: Any | None = None
 
+
+# Peor caso legitimo: switch (1200s) + generacion (1200s) + margen.
+# Un job activo sin moverse por mas que esto es un zombie (worker muerto por
+# restart/shutdown, o backend caido a mitad de camino como el race wan/sdxl
+# del 2026-10-05). Se marca failed en lectura para que el front no gire eterno.
+STALE_AFTER_SECONDS = 45 * 60
+
+
+def _is_stale(job: Dict[str, Any], now: datetime | None = None) -> bool:
+    if (job or {}).get("status") not in ("queued", "running"):
+        return False
+    try:
+        ts = datetime.fromisoformat(job.get("updated_at") or "")
+    except Exception:
+        return False
+    if ts.tzinfo is None:
+        ts = ts.replace(tzinfo=timezone.utc)
+    base = now or datetime.now(timezone.utc)
+    return (base - ts).total_seconds() > STALE_AFTER_SECONDS
+
+
+def _reap_if_stale(job: Dict[str, Any] | None) -> Dict[str, Any] | None:
+    if job is not None and _is_stale(job):
+        try:
+            queue.update_status(
+                job["id"],
+                "failed",
+                error=f"sin progreso por mas de {STALE_AFTER_SECONDS // 60} min — el worker murio o el backend cayo; reenviá el job",
+            )
+            return queue.get(job["id"]) or job
+        except Exception as exc:
+            logger.warning("stale reap failed job=%s err=%s", job.get("id"), exc)
+    return job
+
 @router.post("/image", status_code=202)
 async def enqueue_image_job(req: ImageJobRequest, background_tasks: BackgroundTasks) -> Dict[str, Any]:
     q = req.quality.lower()
@@ -69,6 +123,28 @@ async def enqueue_image_job(req: ImageJobRequest, background_tasks: BackgroundTa
     h = req.height or preset["height"]
     s = req.steps or preset["steps"]
     payload = {"prompt": req.prompt, "quality": q, "width": w, "height": h, "steps": s, "cfg": preset["cfg"]}
+    if req.overlays:
+        clean = []
+        for o in req.overlays:
+            if o.slot not in OVERLAY_SLOTS:
+                raise HTTPException(status_code=400, detail=f"overlay slot inválido: {o.slot} (usá {', '.join(OVERLAY_SLOTS)})")
+            clean.append({"slot": o.slot, "text": o.text[:200]})
+        payload["overlays"] = clean
+    if req.messages:
+        clean_m = []
+        for m in req.messages[:12]:
+            if m.who not in ("bot", "cliente"):
+                raise HTTPException(status_code=400, detail="messages[].who debe ser bot|cliente")
+            clean_m.append({"who": m.who, "text": m.text[:160]})
+        payload["messages"] = clean_m
+    if req.photo:
+        if len(req.photo) > 7 * 1024 * 1024:
+            raise HTTPException(status_code=413, detail="foto muy pesada (tope 7MB)")
+        payload["photo"] = req.photo
+    # restyle: true = redibuja la foto "similar pero nueva" (img2img 0.65).
+    # El texto sale deformado a propósito: los textos finales los pega PIL.
+    if req.restyle:
+        payload["restyle"] = True
     if len(json.dumps(payload).encode("utf-8")) > MAX_PAYLOAD_SIZE:
         raise HTTPException(status_code=413, detail="Payload too large")
     job_id = queue.enqueue(payload)
@@ -116,14 +192,17 @@ async def list_jobs(limit: int = 20) -> Dict[str, Any]:
         try:
             raw = queue.redis.get(k)
             if raw:
-                j = json.loads(raw)
-                progress = 0
-                if j.get("status") == "completed":
-                    progress = 100
-                elif j.get("status") == "running":
-                    progress = 50
-                elif j.get("status") == "queued":
-                    progress = 0
+                j = _reap_if_stale(json.loads(raw))
+                progress = j.get("progress") if isinstance(j.get("progress"), (int, float)) else None
+                if progress is None:
+                    if j.get("status") == "completed":
+                        progress = 100
+                    elif j.get("status") == "running":
+                        progress = 50
+                    elif j.get("status") == "queued":
+                        progress = 0
+                    else:
+                        progress = 0
                 jobs.append({kk: j.get(kk) for kk in ("id", "status", "created_at", "updated_at", "error", "result")})
                 jobs[-1]["progress"] = progress
         except Exception:
@@ -139,10 +218,35 @@ async def list_jobs(limit: int = 20) -> Dict[str, Any]:
 
 @router.get("/{job_id}")
 async def get_job_status(job_id: str) -> JobStatusResponse:
+    job = _reap_if_stale(queue.get(job_id))
+    if job is None:
+        raise HTTPException(status_code=404, detail="Job not found")
+    return JobStatusResponse(**{k: job.get(k) for k in ("id", "status", "created_at", "updated_at", "result", "error")})
+
+
+@router.delete("/{job_id}")
+async def cancel_job(job_id: str, request: Request) -> Dict[str, Any]:
+    """Cancela un job activo: lo marca failed para que el front lo suelte.
+
+    El worker chequea el estado antes y despues del POST al backend, asi que
+    un job cancelado encolado no se genera y uno cancelado a mitad no pisa el
+    failed con un completed tardio. Lo que ya este dentro del POST bloqueante
+    igual termina en el backend (se descarta el archivo).
+    """
     job = queue.get(job_id)
     if job is None:
         raise HTTPException(status_code=404, detail="Job not found")
-    return JobStatusResponse(**job)
+    if job.get("status") not in ("queued", "running"):
+        return {"id": job_id, "status": job.get("status"), "detail": "ya termino"}
+    client = request.client.host if request.client else "?"
+    ua = request.headers.get("user-agent", "-")
+    logger.warning(
+        "AUDIT cancel job=%s prev_status=%s created=%s updated=%s client=%s ua=%s path=%s",
+        job_id, job.get("status"), job.get("created_at"), job.get("updated_at"),
+        client, ua[:120], request.url.path,
+    )
+    queue.update_status(job_id, "failed", error="cancelado por el usuario")
+    return {"id": job_id, "status": "failed", "detail": "cancelado"}
 
 
 @router.get("/{job_id}/result")
@@ -194,8 +298,6 @@ async def switch_model(req: SwitchRequest) -> Dict[str, str]:
     if orchestrator.active_model == req.model:
         LAST_SWITCH.update({"model": req.model, "status": "already_active", "detail": "ya estaba cargado"})
         return {"model": req.model, "status": "already_active"}
-
-    from datetime import datetime, timezone
 
     LAST_SWITCH.update(
         {"model": req.model, "status": "switching", "detail": "switch en background", "started_at": datetime.now(timezone.utc).isoformat(), "finished_at": None}

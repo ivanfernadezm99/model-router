@@ -34,9 +34,10 @@ async def test_e2e_code_image_video_code_under_180s():
     seq = ["sdxl", "sdxl", "coder-q4-131k"]  # image, video (both sdxl), back to code
     order = []
 
-    def fake_run(action, service):
+    def fake_run(action, service, timeout=None):
         order.append(f"{action}:{service}")
-        m = MagicMock(returncode=0, stdout="")
+        # adopt-probe: servicios "caídos" en este escenario frío -> full switch
+        m = MagicMock(returncode=3 if action == "is-active" else 0, stdout="")
         return m
 
     with patch("src.orchestrator.lifecycle._run_systemctl", side_effect=fake_run):
@@ -44,16 +45,18 @@ async def test_e2e_code_image_video_code_under_180s():
             with patch("src.orchestrator.lifecycle.check_vram_for_model", return_value=(True, 800)):
                 with patch("src.orchestrator.lifecycle.holds_ok", return_value=(True, True)):
                     with patch("src.orchestrator.lifecycle.poll_health", new_callable=AsyncMock, return_value=True):
-                        for target in seq:
-                            t0 = time.monotonic()
-                            ok = await orch.switch_to(target)
-                            elapsed = time.monotonic() - t0
-                            assert ok is True
-                            assert elapsed < 180, f"switch to {target} exceeded 180s: {elapsed}"
-                        # stop-before-start: each switch (except coalesced video→video) issues stop+start
-                        assert "stop:llama-code-q4.service" in order
-                        assert order.count("start:sdxl.service") == 1  # video coalesces on same sdxl
-                        assert "start:llama-code-q4.service" in order
+                        with patch("src.orchestrator.lifecycle.wait_http_200", new_callable=AsyncMock, return_value=True):
+                            with patch("src.orchestrator.lifecycle.wait_port_free", new_callable=AsyncMock, return_value=True):
+                                for target in seq:
+                                    t0 = time.monotonic()
+                                    ok = await orch.switch_to(target)
+                                    elapsed = time.monotonic() - t0
+                                    assert ok is True
+                                    assert elapsed < 180, f"switch to {target} exceeded 180s: {elapsed}"
+                                # stop-before-start: each switch (except coalesced video→video) issues stop+start
+                                assert "stop:llama-code-q4.service" in order
+                                assert order.count("start:sdxl.service") == 1  # video coalesces on same sdxl
+                                assert "start:llama-code-q4.service" in order
 
 
 @pytest.mark.asyncio

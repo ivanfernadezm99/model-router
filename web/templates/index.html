@@ -78,7 +78,7 @@
        <option value="video">🎥 video — Texto → Video (Wan T2V :8189)</option>
        <option value="i2v">🖼️ i2v — Foto → Video animado (Wan I2V :8191)</option>
        <option value="avatar">👤 avatar — Foto + audio → vos hablando (EchoMimicV2 :8192)</option>
-       <option value="image">🖌️ image — Crear / mejorar foto (SDXL :8188)</option>
+       <option value="image">🆕 NUEVO image — FOTO FIJA publicitaria con texto (Qwen-Image 20B :8188). Genera UNA imagen (ej: aviso con precios). NO es video: video/i2v/avatar generan VIDEO con movimiento.</option>
      </select>
     <div id="modelDesc" class="small"></div>
   </div>
@@ -88,12 +88,16 @@
     <label for="prompt">Texto / prompt</label>
     <textarea id="prompt" placeholder="Ej: cámara lenta recorre el POS... / Hola, les presento mi sistema..."></textarea>
     <div id="imageWrap">
-      <label for="imageFile">Imagen o video (examinar)</label>
+      <label for="imageFile">Imagen o video (examinar o arrastrar acá)</label>
       <input type="file" id="imageFile" accept="image/*,video/*">
+      <input type="text" id="imagePath" placeholder="…o pegá la ruta: /home/servidor/Imágenes/foto.png" style="margin-top:4px">
+      <div id="imageName" class="small muted" style="margin-top:4px">Sin archivo</div>
     </div>
     <div id="audioWrap" style="display:none">
-      <label for="audioFile">Audio con tu voz (examinar, solo avatar)</label>
+      <label for="audioFile">Audio con tu voz (examinar o arrastrar acá, solo avatar)</label>
       <input type="file" id="audioFile" accept="audio/*">
+      <input type="text" id="audioPath" placeholder="…o pegá la ruta: /home/servidor/Música/voz.wav" style="margin-top:4px">
+      <div id="audioName" class="small muted" style="margin-top:4px">Sin archivo</div>
     </div>
     <div id="qualityWrap" style="display:none">
       <label for="quality">Calidad SDXL</label>
@@ -103,7 +107,17 @@
         <option value="max">max (1024, lento)</option>
       </select>
     </div>
+    <div id="overlayWrap" style="display:none">
+      <label>Textos exactos sobre la foto <span class="small muted">(salen letra por letra, sin IA)</span></label>
+      <input type="text" id="ovTitle" placeholder="Título grande arriba" style="margin-top:4px">
+      <input type="text" id="ovSubtitle" placeholder="Subtítulo (opcional)" style="margin-top:4px">
+      <input type="text" id="ovContact" placeholder="Contacto en botón verde (opcional)" style="margin-top:4px">
+      <input type="text" id="ovBrand" placeholder="Marca abajo a la derecha (opcional)" style="margin-top:4px">
+      <textarea id="ovChat" placeholder="Chat real (opcional), una línea por mensaje: bot: Hola ¿qué van a pedir? / cliente: 2 burguers y una promo" rows="3" style="margin-top:4px"></textarea>
+      <label style="margin-top:4px"><input type="checkbox" id="ovRestyle" style="width:auto"> Rediseñar la foto (nueva similar, ~10 min con GPU)</label>
+    </div>
     <button class="btn" id="sendBtn">Enviar job</button>
+    <button class="btn ghost" id="loadNeededBtn" style="display:none; margin-left:8px">Cargar modelo del job</button>
     <div id="jobStatus"></div>
   </div>
 
@@ -139,7 +153,7 @@ var DESCS = {
        video: "Crea un video desde cero a partir de texto. Sin archivo: solo prompt. Ideal para escenas o fondos.",
        i2v: "Anima tu foto o video: paneo / zoom cinematográfico con tu prompt. ⚠️ REQUIERE imagen o video base.",
        avatar: "Te hace hablar: adjuntá tu foto y un audio con tu voz + el texto. ⚠️ REQUIERE foto + audio.",
-       image: "Crea o mejora una foto: solo prompt para crear, o adjuntá foto + qué mejorar (luz, fondo, calidad)."
+       image: "🆕 NUEVO Qwen-Image 20B: genera 1 FOTO publicitaria con texto. Solo prompt + calidad."
      };
      // Requisitos por modelo — habilita/deshabilita inputs y valida antes de enviar
      var MODEL_REQS = {
@@ -147,9 +161,14 @@ var DESCS = {
        video:  { needImage:false, needAudio:false, needQuality:false, hint:"Solo prompt, sin archivos." },
        i2v:    { needImage:true,  needAudio:false, needQuality:false, hint:"Requiere imagen/video base + prompt." },
        avatar: { needImage:true,  needAudio:true,  needQuality:false, hint:"Requiere foto + audio + prompt." },
-       image:  { needImage:false, needAudio:false, needQuality:true,  hint:"Prompt solo crea, con imagen mejora." }
+       image:  { needImage:false, needAudio:false, needQuality:true,  hint:"🆕 NUEVO: genera 1 FOTO con texto (avisos, promos). Con foto adjunta la usa de fondo + textos (instantáneo, sin IA). Sin foto la genera (~13 min). No es video." }
      };
     var modelEl = document.getElementById('model');
+    var descEl = document.getElementById('modelDesc');
+    // única verdad del frente: qué modelo está cargado (sección 0 + /api/health).
+    // La sección 1 (job) se habilita solo si su modelo coincide con este.
+    var loadedModel = null;
+    var JOB_MODEL = { vision: 'vision-7b', video: 'wan-14b', i2v: 'wan-i2v-14b', avatar: 'echomimic-v2', image: 'qwen-image' };
     var descEl = document.getElementById('modelDesc');
     var imageWrap = document.getElementById('imageWrap');
     var audioWrap = document.getElementById('audioWrap');
@@ -224,6 +243,8 @@ var DESCS = {
       var audInput = document.getElementById('audioFile');
       if (audInput) audInput.required = !!req.needAudio;
       qualityWrap.style.display = req.needQuality ? 'block' : 'none';
+      var ovWrap = document.getElementById('overlayWrap');
+      if (ovWrap) ovWrap.style.display = (m === 'image') ? 'block' : 'none';
       // actualiza estado del botón
       validateForm();
     }
@@ -231,15 +252,40 @@ var DESCS = {
       var m = modelEl.value;
       var req = MODEL_REQS[m] || {};
       var promptOk = document.getElementById('prompt').value.trim().length > 0;
-      var imgOk = !req.needImage || document.getElementById('imageFile').files.length > 0;
-      var audOk = !req.needAudio || document.getElementById('audioFile').files.length > 0;
-      var ok = promptOk && imgOk && audOk;
+      var imgOk = !req.needImage || filePathOk('imageFile', 'imagePath');
+      var audOk = !req.needAudio || filePathOk('audioFile', 'audioPath');
+      // coherencia: el job solo sale si su modelo es el cargado (sección 0).
+      // Sin esto el botón se habilita, el job viaja y muere con 409.
+      var needLoaded = JOB_MODEL[m] || null;
+      var loadedOk = !needLoaded || !loadedModel || (loadedModel === needLoaded);
+      var ok = promptOk && imgOk && audOk && loadedOk;
+      sendBtn.disabled = !ok;
+      // atajo: si solo falta el modelo, un click lo carga en la sección 0
+      var loadBtn2 = document.getElementById('loadNeededBtn');
+      if (loadBtn2) {
+        if (needLoaded && loadedModel && loadedModel !== needLoaded && promptOk && imgOk && audOk) {
+          loadBtn2.style.display = '';
+          loadBtn2.textContent = 'Cargar ' + needLoaded + ' y continuar';
+          loadBtn2.onclick = function() {
+            for (var i = 0; i < activeSel.options.length; i++) {
+              if (activeSel.options[i].value === needLoaded) { activeSel.selectedIndex = i; break; }
+            }
+            refreshActiveDesc();
+            document.getElementById('loadBtn').click();
+            window.scrollTo(0, 0);
+          };
+        } else {
+          loadBtn2.style.display = 'none';
+          loadBtn2.onclick = null;
+        }
+      }
       sendBtn.disabled = !ok;
       if (!ok) {
         var faltan = [];
         if (!promptOk) faltan.push('prompt');
         if (!imgOk) faltan.push('imagen');
         if (!audOk) faltan.push('audio');
+        if (!loadedOk) faltan.push('cargar ' + needLoaded + ' en la sección 0 (ahora hay ' + loadedModel + ')');
         sendBtn.title = 'Falta: ' + faltan.join(', ');
       } else {
         sendBtn.title = 'Enviar job a ' + m;
@@ -248,11 +294,74 @@ var DESCS = {
     }
     modelEl.addEventListener('change', refreshModel);
     document.getElementById('prompt').addEventListener('input', validateForm);
+    // nombre visible + drag&drop (si el diálogo del SO falla, arrastrar salta el picker)
+    function filePathOk(inputId, pathId) {
+      var inp = document.getElementById(inputId);
+      var p = document.getElementById(pathId);
+      if (inp && inp.files && inp.files.length > 0) return true;
+      if (p && p.value.trim().length > 0) return true;
+      return false;
+    }
+    function showFileName(inputId, labelId) {
+      var inp = document.getElementById(inputId);
+      var lab = document.getElementById(labelId);
+      if (!inp || !lab) return;
+      var f = inp.files && inp.files[0];
+      lab.textContent = f ? ('✓ ' + f.name + ' (' + Math.round(f.size / 1024) + ' KB)') : 'Sin archivo';
+    }
+    function wireFileInput(inputId, labelId, wrapId) {
+      var inp = document.getElementById(inputId);
+      if (!inp) return;
+      inp.addEventListener('change', function() { showFileName(inputId, labelId); validateForm(); });
+      var wrap = document.getElementById(wrapId);
+      if (wrap) {
+        ['dragover', 'dragenter'].forEach(function(ev) {
+          wrap.addEventListener(ev, function(e) { e.preventDefault(); wrap.style.outline = '2px dashed var(--accent)'; });
+        });
+        ['dragleave', 'drop'].forEach(function(ev) {
+          wrap.addEventListener(ev, function(e) { e.preventDefault(); wrap.style.outline = ''; });
+        });
+        wrap.addEventListener('drop', function(e) {
+          if (e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files.length) {
+            try {
+              var dt = new DataTransfer();
+              for (var i = 0; i < e.dataTransfer.files.length; i++) dt.items.add(e.dataTransfer.files[i]);
+              inp.files = dt.files;
+            } catch (err) { /* navegador viejo: no se puede asignar */ }
+            showFileName(inputId, labelId); validateForm();
+          }
+        });
+      }
+    }
+    wireFileInput('imageFile', 'imageName', 'imageWrap');
+    wireFileInput('audioFile', 'audioName', 'audioWrap');
+    document.getElementById('imagePath').addEventListener('input', validateForm);
+    document.getElementById('audioPath').addEventListener('input', validateForm);
     document.getElementById('imageFile').addEventListener('change', validateForm);
     document.getElementById('audioFile').addEventListener('change', validateForm);
     refreshModel();
 
     function showJob(html) { jobStatus.style.display = 'block'; jobStatus.innerHTML = html; }
+
+    function stallHtml(j) {
+      var st = j && j.status;
+      if (st !== 'queued' && st !== 'running') return '';
+      var t = Date.parse(j.updated_at || '');
+      if (isNaN(t)) return '';
+      var mins = Math.floor((Date.now() - t) / 60000);
+      if (mins >= 12) return '<br><span class="err">⚠️ sin progreso hace ' + mins + ' min — el worker puede estar muerto o el backend caído. Si no avanza, cancelalo y reenvialo.</span>';
+      return '';
+    }
+
+    async function cancelJob(id) {
+      if (!confirm('¿Cancelar el job ' + String(id).substring(0, 8) + '...?')) return;
+      try {
+        var r = await fetch('/api/job/' + id, { method: 'DELETE' });
+        var d = await r.json();
+        if (!r.ok) throw new Error(d.error || ('HTTP ' + r.status));
+        loadQueue(); pollJob();
+      } catch (e) { showJob('<span class="err">No se pudo cancelar: ' + escHtml(e.message) + '</span>'); }
+    }
 
     async function pollJob() {
       if (!currentJob) return;
@@ -277,7 +386,7 @@ var DESCS = {
           var fname2 = String(f2).split('/').pop();
           extra += '<br><span class="ok">Archivo: ' + escHtml(f2) + '</span>' + mediaPreviewHtml(currentJob, fname2, 'media-preview');
         }
-        showJob('<strong>Job:</strong> ' + escHtml(currentJob.substring(0, 8)) + '...<br><strong>Estado:</strong> ' + escHtml(st) + extra);
+        showJob('<strong>Job:</strong> ' + escHtml(currentJob.substring(0, 8)) + '...<br><strong>Estado:</strong> ' + escHtml(st) + extra + stallHtml(d));
         if (st === 'completed' || st === 'failed') { clearInterval(pollTimer); pollTimer = null; loadQueue(); }
       } catch (e) { showJob('<span class="err">Error consultando job: ' + escHtml(e.message) + '</span>'); }
     }
@@ -287,23 +396,48 @@ var DESCS = {
       if (!prompt) { showJob('<span class="err">Escribí un prompt primero.</span>'); return; }
       var m = modelEl.value;
       var req = MODEL_REQS[m] || {};
-      if (req.needImage && !document.getElementById('imageFile').files[0]) { showJob('<span class="err">Falta imagen: el modelo ' + m + ' requiere una foto/video base.</span>'); return; }
-      if (req.needAudio && !document.getElementById('audioFile').files[0]) { showJob('<span class="err">Falta audio: el modelo avatar requiere audio con tu voz.</span>'); return; }
+      if (req.needImage && !document.getElementById('imageFile').files[0] && !document.getElementById('imagePath').value.trim()) { showJob('<span class="err">Falta imagen: el modelo ' + m + ' requiere una foto/video base.</span>'); return; }
+      if (req.needAudio && !document.getElementById('audioFile').files[0] && !document.getElementById('audioPath').value.trim()) { showJob('<span class="err">Falta audio: el modelo avatar requiere audio con tu voz.</span>'); return; }
       var fd = new FormData();
       fd.append('model', m);
       fd.append('prompt', prompt);
       fd.append('quality', document.getElementById('quality').value);
       var img = document.getElementById('imageFile').files[0];
       if (img) fd.append('image', img);
+      else { var ip = document.getElementById('imagePath').value.trim(); if (ip) fd.append('image_path', ip); }
       var aud = document.getElementById('audioFile').files[0];
       if (aud) fd.append('audio', aud);
+      else { var ap = document.getElementById('audioPath').value.trim(); if (ap) fd.append('audio_path', ap); }
+      if (m === 'image') {
+        var ovs = [];
+        var t = document.getElementById('ovTitle').value.trim(); if (t) ovs.push({slot: 'title', text: t});
+        var s = document.getElementById('ovSubtitle').value.trim(); if (s) ovs.push({slot: 'subtitle', text: s});
+        var c = document.getElementById('ovContact').value.trim(); if (c) ovs.push({slot: 'contact', text: c});
+        var b = document.getElementById('ovBrand').value.trim(); if (b) ovs.push({slot: 'brand', text: b});
+        if (ovs.length) fd.append('overlays', JSON.stringify(ovs));
+        var chatRaw = document.getElementById('ovChat').value.trim();
+        if (chatRaw) {
+          var msgs = [];
+          chatRaw.split('\n').forEach(function(line) {
+            var t = line.trim();
+            if (!t) return;
+            var m = t.match(/^(bot|cliente)\s*:\s*(.*)$/i);
+            if (m) msgs.push({who: m[1].toLowerCase(), text: m[2]});
+            else msgs.push({who: 'bot', text: t});
+          });
+          if (msgs.length) fd.append('messages', JSON.stringify(msgs));
+        }
+        var rs = document.getElementById('ovRestyle');
+        if (m === 'image' && rs && rs.checked) fd.append('restyle', 'true');
+      }
       sendBtn.disabled = true; sendBtn.textContent = 'Enviando...';
       showJob('Enviando al modelo <strong>' + m + '</strong>...');
       try {
         var r = await fetch('/api/submit', { method: 'POST', body: fd });
         var d = await r.json();
         if (!r.ok) throw new Error(d.error || ('HTTP ' + r.status));
-        currentJob = d.job_id;
+        currentJob = d.job_id || d.id;
+        if (!currentJob) { showJob('<span class="err">El servidor no devolvió ID de job (respuesta: ' + escHtml(JSON.stringify(d).substring(0, 200)) + ').</span>'); sendBtn.disabled = false; sendBtn.textContent = 'Enviar job'; return; }
         showJob('<strong>Job:</strong> ' + currentJob.substring(0, 8) + '...<br><strong>Modelo:</strong> ' + d.target + '<br>Estado: queued (consultando...)');
         if (pollTimer) clearInterval(pollTimer);
         pollTimer = setInterval(pollJob, 3000);
@@ -318,8 +452,13 @@ var DESCS = {
         var d = await r.json();
         var vram = d.vram_used_mb ? (d.vram_used_mb / 1024).toFixed(1) : '?';
         healthBox.innerHTML = '<strong>Modelo:</strong> ' + (d.model || 'ninguno') + '<br><strong>VRAM:</strong> ' + vram + ' GB / 24 GB<br><strong>Estado:</strong> ' + (d.status || '?');
+        // coherencia: si el activo cambió desde el último loadModels, re-sincroniza
+        // la sección 0 ya (no espera al ciclo de 15s). Evita "arriba dice X, abajo Y".
+        if (d.model && d.model !== loadedModel) { loadModels(); }
+        else if (!d.model && loadedModel) { loadedModel = null; validateForm(); }
       } catch (e) { healthBox.innerHTML = '<span class="err">Error router (' + e.message + ')</span>'; }
     }
+    var lastQueueHtml = null;
     async function loadQueue() {
       try {
         var r = await fetch('/api/queue');
@@ -341,7 +480,7 @@ var DESCS = {
             if (isCompleted) {
               var url = resultUrl(j.id);
               if (fname) {
-                if (isVid) thumb = '<video class="thumb" src="' + url + '" preload="metadata" muted onclick="openLightbox(\'' + escJs(j.id) + '\',\'' + escJs(fname) + '\')"></video>';
+                if (isVid) thumb = '<video class="thumb" src="' + url + '" preload="none" muted onclick="openLightbox(\'' + escJs(j.id) + '\',\'' + escJs(fname) + '\')"></video>';
                 else thumb = '<img class="thumb" src="' + url + '" alt="' + escHtml(fname) + '" loading="lazy" onclick="openLightbox(\'' + escJs(j.id) + '\',\'' + escJs(fname) + '\')" />';
               }
               actions = '<button class="btn-sm primary" style="padding:3px 8px;font-size:11px" onclick="openLightbox(\'' + escJs(j.id) + '\',\'' + escJs(fname) + '\')">Ver</button>'
@@ -352,10 +491,15 @@ var DESCS = {
             }
             var thumbWrap = thumb ? '<div class="queue-thumb-wrap">' + thumb + '</div>' : '';
             var cls = isCompleted && thumb ? 'queue-item has-thumb' : 'queue-item';
-            html += '<div class="' + cls + '">' + bar + thumbWrap + ' <span>' + escHtml((j.id || '?').substring(0, 8)) + '... — ' + escHtml(j.status) + ' ' + pct + '%' + extra + '</span> ' + actions + '</div>';
+            var active = (j.status === 'queued' || j.status === 'running');
+            if (active) actions += '<button class="btn-sm ghost" style="padding:3px 8px;font-size:11px" onclick="cancelJob(\'' + escJs(j.id) + '\')">✖</button>';
+            var errHtml = (j.status === 'failed' && j.error) ? '<br><span class="err">' + escHtml(String(j.error).substring(0, 220)) + '</span>' : '';
+            html += '<div class="' + cls + '">' + bar + thumbWrap + ' <span>' + escHtml((j.id || '?').substring(0, 8)) + '... — ' + escHtml(j.status) + ' ' + pct + '%' + extra + errHtml + stallHtml(j) + '</span> ' + actions + '</div>';
           });
-          queueBox.innerHTML = html;
-        } else { queueBox.innerHTML = d.message || 'Cola vacía'; }
+          // no re-renderizar si nada cambió: recrear <video> cada 5s
+          // re-dispara descargas de metadata y congela la página
+          if (html !== lastQueueHtml) { queueBox.innerHTML = html; lastQueueHtml = html; }
+        } else { var em = d.message || 'Cola vacía'; if (em !== lastQueueHtml) { queueBox.innerHTML = em; lastQueueHtml = em; } }
       } catch (e) { queueBox.innerHTML = '<span class="err">Error cola (' + escHtml(e.message) + ')</span>'; }
     }
     var activeSel = document.getElementById('activeModel');
@@ -504,6 +648,9 @@ MODELS_CACHE.sort(function(a,b){
         });
         // si no había activo, respetamos fallback guardado/default sin sobreescribir localStorage aún
         refreshActiveDesc();
+        var nowActive = null;
+        MODELS_CACHE.forEach(function(m) { if (m.active) nowActive = m.name; });
+        if (nowActive !== loadedModel) { loadedModel = nowActive; validateForm(); }
         if (!MODELS_CACHE.length) activeDesc.textContent = d.error || 'Sin modelos.';
       } catch (e) { activeDesc.textContent = 'Error cargando modelos (' + e.message + ')'; }
     }
