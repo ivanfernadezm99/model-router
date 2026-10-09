@@ -21,6 +21,17 @@ los trabajos completos como se le pide, sin vagancia.
    verificados o FAIL, Result Contract completo, comparación de enfoques.
 3. Reintentar explore del gimnasio con ese prompt duro.
 
+## Verificación en producción (2026-10-09)
+
+Usuario confirmó que FUNCIONÓ en su otra sesión abierta contra el gateway
+reiniciado (proceso nuevo 19:18, commit `2211521`).
+
+- Alcance final: solo Qwen2.5-Coder (`_is_qwen25_coder` por archivo de modelo
+  en args del registry — cubre coder-14b-100k/150k/190k/250k-ram y futuros).
+- Qwen3, 30B, vision y resto: intactos, `1.0` explícito se respeta.
+- Restart gateway: `XDG_RUNTIME_DIR=/run/user/$(id -u) systemctl --user
+  restart model-router-gateway.service` (sin sudo).
+
 ## Nota Engram
 
 `mem_save` falló esta sesión (múltiples sesiones runtime activas,
