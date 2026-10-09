@@ -28,7 +28,20 @@ def _redact(headers: dict) -> dict:
     return out
 
 
-async def proxy_request(request: Request, target_port: int, retry_after: int | None = None, task: str | None = None) -> Response | StreamingResponse:
+def _is_qwen25_coder(spec: dict | None) -> bool:
+    """True when the loaded model is a Qwen2.5-Coder (any context size).
+
+    Detection is by model file path in the registry spec args, so every
+    present and future coder-14b-* variant matches without name hardcoding.
+    Unknown spec (None) returns True to preserve the historic behavior.
+    """
+    if spec is None:
+        return True
+    args = spec.get("args") or []
+    return any("Qwen2.5-Coder" in str(a) for a in args)
+
+
+async def proxy_request(request: Request, target_port: int, retry_after: int | None = None, task: str | None = None, active_spec: dict | None = None) -> Response | StreamingResponse:
     """Proxy request to http://127.0.0.1:{target_port}{path} preserving method, headers, streaming."""
     request_id = request.headers.get("x-request-id") or str(uuid.uuid4())[:8]
     start = time.monotonic()
@@ -121,10 +134,12 @@ async def proxy_request(request: Request, target_port: int, retry_after: int | N
 
                 # An explicit repeat_penalty of 1.0 means "disabled" — virtually
                 # never intentional from an agent client, and it leaves the
-                # model with no repetition control at all. Treat it as absent
-                # so the floor below applies. Any other explicit value keeps
-                # rule 1 absolute: it is respected untouched.
-                if parsed.get("repeat_penalty") == 1.0:
+                # model with no repetition control at all. On Qwen2.5-Coder
+                # models (the vague ones) treat it as absent so the floor
+                # below applies. Any other explicit value keeps rule 1
+                # absolute: it is respected untouched. Other model families
+                # keep strict never-override behavior.
+                if parsed.get("repeat_penalty") == 1.0 and _is_qwen25_coder(active_spec):
                     del parsed["repeat_penalty"]
                     patched["repeat_penalty_from_disabled_1.0"] = True
 

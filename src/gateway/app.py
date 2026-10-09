@@ -171,7 +171,7 @@ async def v1_proxy(path: str, request: Request):
 
     # if target equals active -> proxy directly (fast path)
     if orchestrator.active_model == target_model:
-        resp = await proxy_request(request, target_port, task=task)
+        resp = await proxy_request(request, target_port, task=task, active_spec=registry.resolve(target_model))
         latency_ms = int((time.monotonic() - start) * 1000)
         logger.info(json.dumps({"request_id": request_id, "hint": task, "target_model": target_model, "queue_depth": queue.depth(), "latency_ms": latency_ms, "status": resp.status_code}))
         return resp
@@ -182,7 +182,7 @@ async def v1_proxy(path: str, request: Request):
         try:
             active_spec = registry.resolve(orchestrator.active_model)
             active_port = int(active_spec["port"])
-            resp = await proxy_request(request, active_port, task=task)
+            resp = await proxy_request(request, active_port, task=task, active_spec=active_spec)
             latency_ms = int((time.monotonic() - start) * 1000)
             logger.info(json.dumps({"request_id": request_id, "hint": task, "target_model": target_model, "active_model": orchestrator.active_model, "queue_depth": queue.depth(), "latency_ms": latency_ms, "status": resp.status_code, "coder_passthrough": True}))
             return resp
@@ -196,7 +196,7 @@ async def v1_proxy(path: str, request: Request):
         try:
             active_spec = registry.resolve(orchestrator.active_model)
             active_port = int(active_spec["port"])
-            resp = await proxy_request(request, active_port, task=task)
+            resp = await proxy_request(request, active_port, task=task, active_spec=active_spec)
             latency_ms = int((time.monotonic() - start) * 1000)
             logger.info(json.dumps({"request_id": request_id, "hint": task, "target_model": target_model, "active_model": orchestrator.active_model, "queue_depth": queue.depth(), "latency_ms": latency_ms, "status": resp.status_code, "vision_passthrough": True}))
             return resp
@@ -212,7 +212,7 @@ async def v1_proxy(path: str, request: Request):
             if is_healthy:
                 orchestrator.active_model = target_model
                 orchestrator.active_service = registry.resolve(target_model)["service"]
-                resp = await proxy_request(request, target_port, task=task)
+                resp = await proxy_request(request, target_port, task=task, active_spec=registry.resolve(target_model))
                 latency_ms = int((time.monotonic() - start) * 1000)
                 logger.info(json.dumps({"request_id": request_id, "hint": task, "target_model": target_model, "queue_depth": queue.depth(), "latency_ms": latency_ms, "status": resp.status_code, "adopted": True}))
                 return resp
@@ -238,7 +238,7 @@ async def v1_proxy(path: str, request: Request):
                 from src.orchestrator.health import poll_health as _ph
                 _spec = registry.resolve(orchestrator.active_model)
                 if await _ph(int(_spec["port"]), _spec["health_endpoint"], timeout_s=8):
-                    resp = await proxy_request(request, int(_spec["port"]), task=task)
+                    resp = await proxy_request(request, int(_spec["port"]), task=task, active_spec=_spec)
                     latency_ms = int((time.monotonic() - start) * 1000)
                     logger.info(json.dumps({"request_id": request_id, "hint": task, "target_model": target_model, "active_model": orchestrator.active_model, "queue_depth": queue.depth(), "latency_ms": latency_ms, "status": resp.status_code, "auto_switch": "disabled-passthrough"}))
                     return resp

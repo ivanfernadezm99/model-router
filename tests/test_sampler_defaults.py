@@ -39,7 +39,7 @@ def _request(payload: dict) -> Request:
     return Request(scope, receive)
 
 
-async def _sent_body(payload: dict) -> dict:
+async def _sent_body(payload: dict, spec: dict | None = None) -> dict:
     """Run one proxied request and return the JSON body actually forwarded."""
     captured = {}
 
@@ -53,10 +53,14 @@ async def _sent_body(payload: dict) -> dict:
         return resp
 
     with patch("httpx.AsyncClient.send", _send):
-        await proxy_request(_request(payload), 8082, task="code")
+        await proxy_request(_request(payload), 8082, task="code", active_spec=spec)
 
     assert "content" in captured, "request never reached the backend"
     return json.loads(captured["content"])
+
+
+QWEN25_SPEC = {"args": ["--model", "/home/servidor/Modelos/Qwen2.5-Coder-14B-Instruct-Q4_K_M.gguf", "--chat-template-file", "templates/qwen25-coder-tools.jinja"]}
+QWEN3_SPEC = {"args": ["--model", "/home/servidor/Modelos/Qwen3-Coder/Qwen3-Coder-30B-A3B-Instruct-Q4_K_M.gguf", "--chat-template-file", "templates/qwen3-coder-tools.jinja"]}
 
 
 AGENT = {"messages": [{"role": "user", "content": f"lee {PATH}"}], "tools": [{"type": "function", "function": {"name": "read"}}]}
@@ -81,6 +85,18 @@ def test_explicit_disabled_repeat_penalty_gets_floor_on_agent():
 def test_explicit_disabled_repeat_penalty_gets_floor_on_code():
     out = asyncio_run(_sent_body({**PLAIN_CODE, "repeat_penalty": 1.0}))
     assert out["repeat_penalty"] == 1.15
+
+
+def test_qwen25_variants_get_floor():
+    """Every Qwen2.5-Coder (any context size) gets the floor."""
+    out = asyncio_run(_sent_body({**PLAIN_CODE, "repeat_penalty": 1.0}, spec=QWEN25_SPEC))
+    assert out["repeat_penalty"] == 1.15
+
+
+def test_qwen3_keeps_explicit_disabled_penalty():
+    """Other families keep strict never-override: explicit 1.0 survives."""
+    out = asyncio_run(_sent_body({**PLAIN_CODE, "repeat_penalty": 1.0}, spec=QWEN3_SPEC))
+    assert out["repeat_penalty"] == 1.0
 
 
 def test_client_explicit_top_p_high_survives():
