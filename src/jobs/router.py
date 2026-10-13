@@ -3,7 +3,7 @@ import logging
 import os
 from datetime import datetime, timezone
 
-from fastapi import APIRouter, BackgroundTasks, HTTPException, Request
+from fastapi import APIRouter, HTTPException, Request
 
 logger = logging.getLogger(__name__)
 from fastapi.responses import FileResponse
@@ -11,8 +11,9 @@ from pydantic import BaseModel, constr
 from typing import Dict, Any
 import json
 
-from src.jobs.queue import JobQueue
-from src.jobs.worker import _get_orchestrator, _run_job_async
+from src.jobs import rabbit
+from src.jobs.queue import JobQueue, MAX_RETRIES
+from src.jobs.worker import _get_orchestrator
 from src.gateway.adopt import reconcile_active_model
 
 router = APIRouter(prefix="/jobs")
@@ -20,6 +21,25 @@ router = APIRouter(prefix="/jobs")
 queue = JobQueue()
 
 MAX_PAYLOAD_SIZE = 5 * 1024 * 1024
+
+
+def _dispatch(kind: str, payload: Dict[str, Any]) -> str:
+    """Persist the job in Redis (user-visible state) and hand it to RabbitMQ.
+
+    Redis holds status/attempts/last_error for GET /jobs; RabbitMQ does the
+    actual execution. A dead broker must never produce a fake 202.
+    """
+    payload["kind"] = kind
+    job_id = queue.enqueue(payload)
+    if not job_id:
+        raise HTTPException(status_code=503, detail="cola de jobs no disponible (Redis)")
+    if not rabbit.publish_job(kind, job_id, payload):
+        queue.mark_failed(job_id, "broker RabbitMQ no disponible")
+        raise HTTPException(
+            status_code=503,
+            detail="broker de jobs no disponible — reintentá en unos segundos",
+        )
+    return job_id
 
 class SwitchRequest(BaseModel):
     model: constr(min_length=1)
@@ -78,6 +98,8 @@ class JobStatusResponse(BaseModel):
     updated_at: str
     result: Any | None = None
     error: Any | None = None
+    attempts: int | None = None
+    last_error: str | None = None
 
 
 # Peor caso legitimo: switch (1200s) + generacion (1200s) + margen.
@@ -88,7 +110,9 @@ STALE_AFTER_SECONDS = 45 * 60
 
 
 def _is_stale(job: Dict[str, Any], now: datetime | None = None) -> bool:
-    if (job or {}).get("status") not in ("queued", "running"):
+    # "retrying" también es candidato a stale: el backoff máximo es 900s, así
+    # que si sigue retrying tras STALE_AFTER_SECONDS el broker perdió el mensaje.
+    if (job or {}).get("status") not in ("queued", "running", "retrying"):
         return False
     try:
         ts = datetime.fromisoformat(job.get("updated_at") or "")
@@ -113,8 +137,9 @@ def _reap_if_stale(job: Dict[str, Any] | None) -> Dict[str, Any] | None:
             logger.warning("stale reap failed job=%s err=%s", job.get("id"), exc)
     return job
 
+
 @router.post("/image", status_code=202)
-async def enqueue_image_job(req: ImageJobRequest, background_tasks: BackgroundTasks) -> Dict[str, Any]:
+async def enqueue_image_job(req: ImageJobRequest) -> Dict[str, Any]:
     q = req.quality.lower()
     if q not in IMAGE_PRESETS:
         raise HTTPException(status_code=400, detail="quality must be draft|balanced|max")
@@ -141,44 +166,36 @@ async def enqueue_image_job(req: ImageJobRequest, background_tasks: BackgroundTa
         if len(req.photo) > 7 * 1024 * 1024:
             raise HTTPException(status_code=413, detail="foto muy pesada (tope 7MB)")
         payload["photo"] = req.photo
-    # restyle: true = redibuja la foto "similar pero nueva" (img2img 0.65).
-    # El texto sale deformado a propósito: los textos finales los pega PIL.
     if req.restyle:
         payload["restyle"] = True
     if len(json.dumps(payload).encode("utf-8")) > MAX_PAYLOAD_SIZE:
         raise HTTPException(status_code=413, detail="Payload too large")
-    job_id = queue.enqueue(payload)
-    # wire to Orchestrator via BackgroundTasks — shares VRAM lock with /v1
-    # so 5 videos +10 images via /jobs also serializes to 2 switches (wan-14b -> sdxl)
-    background_tasks.add_task(_run_job_async, job_id, "image", payload, queue)
-    return {"id": job_id}
+    return {"id": _dispatch("image", payload)}
+
 
 @router.post("/video", status_code=202)
-async def enqueue_video_job(req: VideoJobRequest, background_tasks: BackgroundTasks) -> Dict[str, str]:
+async def enqueue_video_job(req: VideoJobRequest) -> Dict[str, str]:
     payload = {"prompt": req.prompt}
     if len(json.dumps(payload).encode("utf-8")) > MAX_PAYLOAD_SIZE:
         raise HTTPException(status_code=413, detail="Payload too large")
-    job_id = queue.enqueue(payload)
-    background_tasks.add_task(_run_job_async, job_id, "video", payload, queue)
-    return {"id": job_id}
+    return {"id": _dispatch("video", payload)}
+
 
 @router.post("/i2v", status_code=202)
-async def enqueue_i2v_job(req: I2VJobRequest, background_tasks: BackgroundTasks) -> Dict[str, str]:
+async def enqueue_i2v_job(req: I2VJobRequest) -> Dict[str, str]:
     payload = {"prompt": req.prompt, "image": req.image}
     if len(json.dumps(payload).encode("utf-8")) > MAX_PAYLOAD_SIZE:
         raise HTTPException(status_code=413, detail="Payload too large")
-    job_id = queue.enqueue(payload)
-    background_tasks.add_task(_run_job_async, job_id, "i2v", payload, queue)
-    return {"id": job_id}
+    return {"id": _dispatch("i2v", payload)}
+
 
 @router.post("/avatar", status_code=202)
-async def enqueue_avatar_job(req: AvatarJobRequest, background_tasks: BackgroundTasks) -> Dict[str, str]:
+async def enqueue_avatar_job(req: AvatarJobRequest) -> Dict[str, str]:
     payload = {"prompt": req.prompt, "image": req.image, "audio": req.audio}
     if len(json.dumps(payload).encode("utf-8")) > MAX_PAYLOAD_SIZE:
         raise HTTPException(status_code=413, detail="Payload too large")
-    job_id = queue.enqueue(payload)
-    background_tasks.add_task(_run_job_async, job_id, "avatar", payload, queue)
-    return {"id": job_id}
+    return {"id": _dispatch("avatar", payload)}
+
 
 @router.get("", include_in_schema=False)
 @router.get("/")
@@ -192,7 +209,10 @@ async def list_jobs(limit: int = 20) -> Dict[str, Any]:
         try:
             raw = queue.redis.get(k)
             if raw:
-                j = _reap_if_stale(json.loads(raw))
+                j = json.loads(raw)
+                # mismo stale reap que GET /jobs/{id}: el listado también
+                # destranca zombies para que el front no los muestre activos.
+                j = _reap_if_stale(j) or j
                 progress = j.get("progress") if isinstance(j.get("progress"), (int, float)) else None
                 if progress is None:
                     if j.get("status") == "completed":
@@ -203,7 +223,10 @@ async def list_jobs(limit: int = 20) -> Dict[str, Any]:
                         progress = 0
                     else:
                         progress = 0
-                jobs.append({kk: j.get(kk) for kk in ("id", "status", "created_at", "updated_at", "error", "result")})
+                # exponer attempts y last_error para visibilidad de retry
+                j["attempts"] = j.get("attempts")
+                j["last_error"] = j.get("last_error")
+                jobs.append({kk: j.get(kk) for kk in ("id", "status", "created_at", "updated_at", "error", "result", "attempts", "last_error")})
                 jobs[-1]["progress"] = progress
         except Exception:
             continue
@@ -216,12 +239,66 @@ async def list_jobs(limit: int = 20) -> Dict[str, Any]:
         j["eta_seconds"] = pos * avg_duration
     return {"jobs": jobs}
 
+
 @router.get("/{job_id}")
 async def get_job_status(job_id: str) -> JobStatusResponse:
-    job = _reap_if_stale(queue.get(job_id))
+    job = queue.get(job_id)
     if job is None:
         raise HTTPException(status_code=404, detail="Job not found")
-    return JobStatusResponse(**{k: job.get(k) for k in ("id", "status", "created_at", "updated_at", "result", "error")})
+    # Leer un job activo sin progreso por >45min lo marca failed: sin esto el
+    # front gira eterno cuando el worker murió a mitad de job.
+    job = _reap_if_stale(job) or job
+    # attempts/last_error: visibilidad de retry (None en jobs antiguos sin reintentos)
+    attempts = job.get("attempts")
+    if not isinstance(attempts, int):
+        attempts = None
+    last_error = job.get("last_error")
+    if not isinstance(last_error, str):
+        last_error = None
+    return JobStatusResponse(
+        **{k: job.get(k) for k in ("id", "status", "created_at", "updated_at", "result", "error")},
+        attempts=attempts,
+        last_error=last_error,
+    )
+
+
+@router.post("/{job_id}/retry", status_code=202)
+async def retry_job(job_id: str) -> Dict[str, Any]:
+    """Reintentar un job fallado.
+
+    Si el job aún no ha alcanzado MAX_RETRIES (3), vuelve a status=queued y
+    reinicia el conteo de intentos; si ya alcanzó el máximo, devuelve 409 con
+    un mensaje indicando que no hay más reintentos disponibles.
+
+    La ejecución la hace el consumer RabbitMQ: acá solo se republica.
+    """
+    job = queue.get(job_id)
+    if job is None:
+        raise HTTPException(status_code=404, detail="Job not found")
+    attempts = job.get("attempts", 0)
+    if attempts is not None and attempts >= MAX_RETRIES:
+        raise HTTPException(
+            status_code=409,
+            detail=f"Máximo de reintentos alcanzado ({MAX_RETRIES}). El job está en estado failed.",
+        )
+    # Volver a status=queued y reiniciar attempts
+    job["status"] = "queued"
+    job["attempts"] = 0
+    job["error"] = None
+    job["last_error"] = None
+    job["updated_at"] = datetime.now(timezone.utc).isoformat()
+    queue.redis.setex(queue._key(job_id), 7 * 24 * 60 * 60, json.dumps(job))
+    # Republicar en RabbitMQ. Ejecutar inline duplicaba el trabajo y rompía la
+    # serialización por VRAM que el consumer garantiza con prefetch=1.
+    payload = job.get("payload") or {}
+    kind = payload.get("kind") or "image"
+    if not rabbit.publish_job(kind, job_id, payload):
+        queue.mark_failed(job_id, "broker RabbitMQ no disponible")
+        raise HTTPException(
+            status_code=503,
+            detail="broker de jobs no disponible — reintentá en unos segundos",
+        )
+    return {"id": job_id, "status": "queued"}
 
 
 @router.delete("/{job_id}")
@@ -289,7 +366,6 @@ async def switch_model(req: SwitchRequest) -> Dict[str, str]:
     # bloquear si ya hay un switch en curso (flag switching_to del orchestrator)
     if orchestrator.switching_to is not None:
         return {"model": req.model, "status": "busy", "detail": f"switch en curso a {orchestrator.switching_to}, esperá"}
-
     # Un gateway reiniciado arranca con active_model=None mientras el modelo
     # sigue corriendo. Sin reconciliar, comparar contra None da "no soy yo" y
     # esta ruta recarga un modelo que ya está cargado: ~100s de downtime por nada.

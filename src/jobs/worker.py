@@ -19,6 +19,11 @@ from src.jobs.queue import JobQueue
 
 logger = logging.getLogger(__name__)
 
+# Estados en los que un job sigue vivo y puede ejecutarse. "retrying" es el
+# estado que el consumer RabbitMQ deja en Redis entre reintentos con backoff:
+# al redeliverar el mensaje, el worker debe retomarlo, no rechazarlo.
+_ACTIVE_STATUSES = ("queued", "running", "retrying")
+
 # disco con más espacio libre (375G) para outputs generados
 OUTPUT_DIR = "/media/servidor/d0a196c3-2d36-4431-b15d-8ea078ad8222/model-router-output"
 os.makedirs(OUTPUT_DIR, exist_ok=True)
@@ -453,7 +458,7 @@ async def _run_job_async(job_id: str, kind: str, payload: dict, job_queue: JobQu
         cur0 = jobs.get(job_id)
     except Exception:
         cur0 = None
-    if cur0 is not None and cur0.get("status") not in ("queued", "running"):
+    if cur0 is not None and cur0.get("status") not in _ACTIVE_STATUSES:
         logger.warning("job %s ya no esta activo al arrancar (%s) — no se corre", job_id, cur0.get("status"))
         return
     try:
@@ -471,7 +476,7 @@ async def _run_job_async(job_id: str, kind: str, payload: dict, job_queue: JobQu
             cur = jobs.get(job_id)
         except Exception:
             cur = None
-        if cur is not None and cur.get("status") not in ("running", "queued"):
+        if cur is not None and cur.get("status") not in _ACTIVE_STATUSES:
             logger.warning("job %s ya no esta activo — no se genera", job_id)
             return
         base = _photo_to_file(payload["photo"], job_id)
@@ -509,7 +514,7 @@ async def _run_job_async(job_id: str, kind: str, payload: dict, job_queue: JobQu
             cur = jobs.get(job_id)
         except Exception:
             cur = None
-        if cur is not None and cur.get("status") not in ("running", "queued"):
+        if cur is not None and cur.get("status") not in _ACTIVE_STATUSES:
             logger.warning("job %s ya no esta activo (%s) — no se genera", job_id, cur.get("status"))
             return
         try:
@@ -618,7 +623,7 @@ async def _run_job_async(job_id: str, kind: str, payload: dict, job_queue: JobQu
             cur = jobs.get(job_id)
         except Exception:
             cur = None
-        if cur is not None and cur.get("status") not in ("running", "queued"):
+        if cur is not None and cur.get("status") not in _ACTIVE_STATUSES:
             logger.warning("job %s cancelado durante la generacion — se descarta el resultado", job_id)
             return
 

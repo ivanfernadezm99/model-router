@@ -1,0 +1,41 @@
+# RabbitMQ broker for model-router /jobs queue.
+#
+#   docker compose -f docker-compose.rabbitmq.yml up -d
+#   docker compose -f docker-compose.rabbitmq.yml ps        # wait for healthy
+#
+# Management UI: http://127.0.0.1:15672  (local dev defaults guest/guest)
+# Credentials, scaling and DLQ inspection: docs/RABBITMQ.md
+#
+# Security note: ports are bound to loopback only — the broker is consumed by
+# local processes (gateway + consumer), not exposed to the network. Override
+# RABBITMQ_USER / RABBITMQ_PASS via environment or a .env file next to this
+# compose file; NEVER commit real credentials into this repo.
+
+services:
+  rabbitmq:
+    image: rabbitmq:3-management
+    container_name: model-router-rabbitmq
+    hostname: rabbitmq
+    environment:
+      # Local development defaults only. Production must override these with
+      # real credentials (see docs/RABBITMQ.md "Credentials").
+      RABBITMQ_DEFAULT_USER: ${RABBITMQ_USER:-guest}
+      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_PASS:-guest}
+    ports:
+      - "127.0.0.1:5672:5672"    # AMQP
+      - "127.0.0.1:15672:15672"  # management UI/API
+    volumes:
+      - rabbitmq_data:/var/lib/rabbitmq
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+
+# Note: retry backoff uses the standard AMQP per-message-TTL + dead-letter
+# pattern (see src/jobs/rabbit.py), so no extra plugins are needed. The
+# official image does not ship rabbitmq_delayed_message_exchange anyway.
+
+volumes:
+  rabbitmq_data:

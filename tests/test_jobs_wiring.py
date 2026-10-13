@@ -31,8 +31,31 @@ def _fake_output(tmp_path):
     return _move
 
 
+def _run_consumer_once(job_id: str, kind: str) -> None:
+    """Drive one job through the real consumer callback.
+
+    The RabbitMQ migration moved execution out of the request: POST /jobs/*
+    only persists the job in Redis and publishes the message, and the consumer
+    process runs the worker. Tests invoke the exact handler the broker calls,
+    so the wiring under test is the production one.
+    """
+    import json
+
+    from src.jobs.consumer import make_handler
+    from src.jobs.router import queue as job_queue
+
+    payload = (job_queue.get(job_id) or {}).get("payload", {})
+    handler = make_handler(job_queue)
+    channel = MagicMock()
+    method = MagicMock(delivery_tag=1)
+    props = MagicMock(headers={"x-attempt": 1}, message_id=job_id)
+    body = json.dumps({"job_id": job_id, "kind": kind, "payload": payload}).encode()
+    handler(channel, method, props, body)
+    channel.basic_ack.assert_called_once_with(1)
+
+
 def test_jobs_image_enqueues_and_completes_with_mocked_switch(tmp_path):
-    """POST /jobs/image returns id and background task completes via mocked orchestrator."""
+    """POST /jobs/image returns the real id; the consumer completes it."""
     from src.jobs.router import queue as job_queue
 
     # clean redis for test isolation
@@ -41,36 +64,28 @@ def test_jobs_image_enqueues_and_completes_with_mocked_switch(tmp_path):
     except Exception:
         pass
 
-    with patch("src.jobs.worker._get_orchestrator") as mock_get, patch("src.jobs.worker._move_file_to_output", side_effect=_fake_output(tmp_path)):
-        mock_orch = MagicMock()
-        mock_orch.switch_to = AsyncMock(return_value=True)
-        mock_reg = MagicMock()
-        mock_reg.resolve.return_value = {"service": "sdxl.service", "port": 8188}
-        mock_get.return_value = (mock_orch, mock_reg)
+    with patch("src.jobs.router.rabbit.publish_job", return_value=True):
+        with patch("src.jobs.worker._get_orchestrator") as mock_get, patch("src.jobs.worker._move_file_to_output", side_effect=_fake_output(tmp_path)):
+            mock_orch = MagicMock()
+            mock_orch.switch_to = AsyncMock(return_value=True)
+            mock_reg = MagicMock()
+            mock_reg.resolve.return_value = {"service": "sdxl.service", "port": 8188}
+            mock_get.return_value = (mock_orch, mock_reg)
 
-        c = TestClient(app)
-        r = c.post("/jobs/image", json={"prompt": "cat in space", "quality": "balanced"})
-        assert r.status_code == 202
-        job_id = r.json()["id"]
-        assert len(job_id) == 32
+            c = TestClient(app)
+            r = c.post("/jobs/image", json={"prompt": "cat in space", "quality": "balanced"})
+            assert r.status_code == 202
+            job_id = r.json()["id"]
+            assert len(job_id) == 32
+            assert job_queue.get(job_id)["status"] == "queued"
 
-        # allow BackgroundTasks to run (TestClient runs them sync after response)
-        # poll job status
-        import time
+            _run_consumer_once(job_id, "image")
 
-        for _ in range(10):
-            r2 = c.get(f"/jobs/{job_id}")
-            assert r2.status_code == 200
-            body = r2.json()
-            if body["status"] in ("completed", "failed"):
-                break
-            time.sleep(0.05)
-
-        body = c.get(f"/jobs/{job_id}").json()
-        # with mocked switch_to True, should be completed
-        assert body["status"] == "completed"
-        assert body["result"]["target"] == "qwen-image"
-        mock_orch.switch_to.assert_called_with("qwen-image")
+            body = c.get(f"/jobs/{job_id}").json()
+            # with mocked switch_to True, should be completed
+            assert body["status"] == "completed"
+            assert body["result"]["target"] == "qwen-image"
+            mock_orch.switch_to.assert_called_with("qwen-image")
 
 
 def test_jobs_video_enqueues_and_completes(tmp_path):
@@ -81,27 +96,43 @@ def test_jobs_video_enqueues_and_completes(tmp_path):
     except Exception:
         pass
 
-    with patch("src.jobs.worker._get_orchestrator") as mock_get, patch("src.jobs.worker._move_file_to_output", side_effect=_fake_output(tmp_path)):
-        mock_orch = MagicMock()
-        mock_orch.switch_to = AsyncMock(return_value=True)
-        mock_reg = MagicMock()
-        mock_reg.resolve.return_value = {"service": "wan-video.service", "port": 8189}
-        mock_get.return_value = (mock_orch, mock_reg)
+    with patch("src.jobs.router.rabbit.publish_job", return_value=True):
+        with patch("src.jobs.worker._get_orchestrator") as mock_get, patch("src.jobs.worker._move_file_to_output", side_effect=_fake_output(tmp_path)):
+            mock_orch = MagicMock()
+            mock_orch.switch_to = AsyncMock(return_value=True)
+            mock_reg = MagicMock()
+            mock_reg.resolve.return_value = {"service": "wan-video.service", "port": 8189}
+            mock_get.return_value = (mock_orch, mock_reg)
 
-        c = TestClient(app)
-        r = c.post("/jobs/video", json={"prompt": "animate cat"})
-        assert r.status_code == 202
-        job_id = r.json()["id"]
-        import time
+            c = TestClient(app)
+            r = c.post("/jobs/video", json={"prompt": "animate cat"})
+            assert r.status_code == 202
+            job_id = r.json()["id"]
 
-        for _ in range(10):
+            _run_consumer_once(job_id, "video")
+
             body = c.get(f"/jobs/{job_id}").json()
-            if body["status"] in ("completed", "failed"):
-                break
-            time.sleep(0.05)
-        body = c.get(f"/jobs/{job_id}").json()
-        assert body["status"] == "completed"
-        assert body["result"]["target"] == "wan-14b"
+            assert body["status"] == "completed"
+            assert body["result"]["target"] == "wan-14b"
+
+
+def test_jobs_post_503_when_broker_down():
+    """Broker caído: 503 honesto, nunca un 202 falso ni un id fantasma."""
+    from src.jobs.router import queue as job_queue
+
+    try:
+        job_queue.flush()
+    except Exception:
+        pass
+
+    with patch("src.jobs.router.rabbit.publish_job", return_value=False):
+        c = TestClient(app)
+        r = c.post("/jobs/image", json={"prompt": "cat", "quality": "draft"})
+    assert r.status_code == 503
+    jobs = c.get("/jobs").json()["jobs"]
+    assert jobs and jobs[0]["status"] == "failed"
+    assert "broker" in (jobs[0]["error"] or "")
+
 
 
 def test_jobs_image_quality_validation():

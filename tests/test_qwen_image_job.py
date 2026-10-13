@@ -164,6 +164,28 @@ def test_chat_autofit_no_overlap(tmp_path):
     assert bad == 0, f"chat invade zona contacto: {bad} px"
 
 
+def _run_consumer_once(job_id: str, kind: str) -> None:
+    """Drive one job through the real consumer callback.
+
+    POST /jobs/* only persists and publishes now; the consumer process runs the
+    worker. Calling the same handler the broker calls keeps this test on the
+    production path instead of the removed BackgroundTask one.
+    """
+    import json
+
+    from src.jobs.consumer import make_handler
+    from src.jobs.router import queue as job_queue
+
+    payload = (job_queue.get(job_id) or {}).get("payload", {})
+    handler = make_handler(job_queue)
+    channel = MagicMock()
+    method = MagicMock(delivery_tag=1)
+    props = MagicMock(headers={"x-attempt": 1}, message_id=job_id)
+    body = json.dumps({"job_id": job_id, "kind": kind, "payload": payload}).encode()
+    handler(channel, method, props, body)
+    channel.basic_ack.assert_called_once_with(1)
+
+
 def test_image_job_with_photo_skips_gpu():
     """Foto base: completa sin switch ni ComfyUI (instantáneo)."""
     import base64
@@ -175,27 +197,23 @@ def test_image_job_with_photo_skips_gpu():
     except Exception:
         pass
     tiny = base64.b64encode(b"\x89PNG\r\nfakepng-bytes").decode()
-    with patch("src.jobs.worker._get_orchestrator") as mock_get:
-        mock_get.return_value = (MagicMock(), MagicMock())
-        c = TestClient(app)
-        r = c.post("/jobs/image", json={
-            "prompt": "fondo", "quality": "balanced",
-            "photo": f"data:image/png;base64,{tiny}",
-            "overlays": [{"slot": "brand", "text": "Test"}],
-        })
-        assert r.status_code == 202
-        job_id = r.json()["id"]
-        import time
-        for _ in range(20):
+    with patch("src.jobs.router.rabbit.publish_job", return_value=True):
+        with patch("src.jobs.worker._get_orchestrator") as mock_get:
+            mock_get.return_value = (MagicMock(), MagicMock())
+            c = TestClient(app)
+            r = c.post("/jobs/image", json={
+                "prompt": "fondo", "quality": "balanced",
+                "photo": f"data:image/png;base64,{tiny}",
+                "overlays": [{"slot": "brand", "text": "Test"}],
+            })
+            assert r.status_code == 202
+            job_id = r.json()["id"]
+            _run_consumer_once(job_id, "image")
             body = c.get(f"/jobs/{job_id}").json()
-            if body["status"] in ("completed", "failed"):
-                break
-            time.sleep(0.05)
-        body = c.get(f"/jobs/{job_id}").json()
-        assert body["status"] == "completed", body
-        assert body["result"]["file"].endswith(".png")
-        # sin switch ni GPU: el orchestrator ni se consulta
-        mock_get.assert_not_called()
+            assert body["status"] == "completed", body
+            assert body["result"]["file"].endswith(".png")
+            # sin switch ni GPU: el orchestrator ni se consulta
+            mock_get.assert_not_called()
 
 
 def test_image_job_with_photo_restyle_goes_gpu(monkeypatch):
@@ -217,7 +235,8 @@ def test_image_job_with_photo_restyle_goes_gpu(monkeypatch):
         return {"file": "/tmp/x.png"}
 
     from unittest.mock import AsyncMock, MagicMock, patch
-    with patch("src.jobs.worker._get_orchestrator") as mock_get, \
+    with patch("src.jobs.router.rabbit.publish_job", return_value=True), \
+         patch("src.jobs.worker._get_orchestrator") as mock_get, \
          patch("src.jobs.worker._run_comfyui_img2img", side_effect=fake_img2img) as mock_rs, \
          patch("src.jobs.worker._run_comfyui_t2i") as mock_t2i:
         mock_orch = MagicMock()
@@ -232,12 +251,7 @@ def test_image_job_with_photo_restyle_goes_gpu(monkeypatch):
         })
         assert r.status_code == 202
         job_id = r.json()["id"]
-        import time
-        for _ in range(20):
-            body = c.get(f"/jobs/{job_id}").json()
-            if body["status"] in ("completed", "failed"):
-                break
-            time.sleep(0.05)
+        _run_consumer_once(job_id, "image")
         assert seen.get("called") is True
         mock_t2i.assert_not_called()
         mock_rs.assert_called_once()
