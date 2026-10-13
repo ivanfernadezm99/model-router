@@ -15,6 +15,9 @@ services:
   rabbitmq:
     image: rabbitmq:3-management
     container_name: model-router-rabbitmq
+    # El broker tiene que volver solo: si no, un reboot deja al consumer
+    # reconectando en el vacío y los jobs quedan encolados sin ejecutor.
+    restart: unless-stopped
     hostname: rabbitmq
     environment:
       # Local development defaults only. Production must override these with
