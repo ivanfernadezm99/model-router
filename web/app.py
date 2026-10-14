@@ -54,6 +54,109 @@ def downloads():
     return render_template("downloads.html")
 
 
+GENERACION_SUBDIR = ("static", "generacion")
+# De dónde salen las piezas de avisos (para el cartel de "faltan archivos").
+AVISOS_SRC = ("/media/servidor/d0a196c3-2d36-4431-b15d-8ea078ad8222"
+              "/proyectos/contenido-visual-ia/output/enlaces-chaco/pro")
+AVISO_TITLES = {
+    "aviso-00-hoja-de-contacto.png": "Hoja de contacto · las 10 piezas",
+    "aviso-01-arca.png": "01 · Facturación ARCA",
+    "aviso-02-offline.png": "02 · Modo offline",
+    "aviso-03-sucursales.png": "03 · Multi-sucursal",
+    "aviso-04-stock.png": "04 · Control de stock",
+    "aviso-05-ventas.png": "05 · Reportes",
+    "aviso-06-fiado.png": "06 · Cuenta corriente",
+    "aviso-07-cobro.png": "07 · Cobro rápido",
+    "aviso-08-soporte.png": "08 · Soporte local",
+    "aviso-09-planes.png": "09 · Planes",
+    "aviso-10-arranque.png": "10 · Arranque rápido",
+    "variante_A.png": "Variante A · demo-imagen",
+    "variante_B.png": "Variante B · demo-imagen",
+    "enlaces-chaco.png": "Aviso Enlaces Chaco (MVP)",
+}
+
+
+def _generacion_dir():
+    import pathlib
+
+    return pathlib.Path(__file__).parent.joinpath(*GENERACION_SUBDIR)
+
+
+def _asset_label(name):
+    if name in AVISO_TITLES:
+        return AVISO_TITLES[name]
+    stem = name.rsplit(".", 1)[0]
+    return stem.replace("_", " ").replace("-", " ").strip().capitalize()
+
+
+def _asset_note(name):
+    if name.startswith("aviso-00"):
+        return "Montaje 5×2 de las 10 piezas · clic para ampliarla"
+    if name.startswith("aviso-"):
+        return "Aviso 1024×1024 · fondo IA + composición PIL"
+    if name.lower().endswith(".mp4"):
+        return "MP4 1280×720 (16:9) · 6.0 s · con audio"
+    return "Aviso publicitario (PNG)"
+
+
+@app.route("/generacion")
+def generacion():
+    """Galería de artefactos de contenido visual IA.
+
+    La carpeta `web/static/generacion/` es la fuente de verdad: cualquier PNG o
+    MP4 que esté ahí aparece solo, sin tocar código. Si la carpeta no existe se
+    crea y la página se ve vacía, nunca un 500."""
+    base = _generacion_dir()
+    if not base.is_dir():
+        base.mkdir(parents=True, exist_ok=True)
+
+    names = [p.name for p in base.iterdir()
+             if p.is_file() and p.suffix.lower() in (".png", ".mp4")
+             and not p.name.startswith(".")]
+    # avisos primero (y la hoja de contacto al frente), después el resto
+    names.sort(key=lambda n: (0 if n.startswith("aviso-00") else
+                              1 if n.startswith("aviso-") else 2, n))
+
+    sheet, assets = None, []
+    for name in names:
+        p = base / name
+        entry = {
+            "name": name,
+            "url": f"/static/generacion/{name}",
+            "exists": True,
+            "size_mb": round(p.stat().st_size / 1048576, 2),
+            "label": _asset_label(name),
+            "note": _asset_note(name),
+            "is_video": p.suffix.lower() == ".mp4",
+        }
+        if name.startswith("aviso-00"):
+            sheet = entry
+        else:
+            assets.append(entry)
+
+    missing = [n for n in AVISO_TITLES if not (base / n).is_file()]
+    return render_template("generacion.html", assets=assets, sheet=sheet,
+                           missing=missing, avisos_src=AVISOS_SRC, base_dir=str(base))
+
+
+@app.route("/generacion/delete/<name>", methods=["POST"])
+def generacion_delete(name):
+    """Borra un artefacto de la galería.
+
+    El nombre se sanea: tiene que ser un nombre simple (sin separadores de ruta)
+    y la ruta resuelta tiene que quedar dentro de la carpeta de la galería."""
+    import pathlib
+    from flask import redirect, url_for
+
+    base = _generacion_dir().resolve()
+    simple = bool(name) and not name.startswith(".") and pathlib.PurePath(name).name == name
+    if simple:
+        p = (base / name).resolve()
+        if p.parent == base and p.is_file() and p.suffix.lower() in (".png", ".mp4"):
+            p.unlink()
+    return redirect(url_for("generacion"))
+
+
 @app.route("/api/health")
 def health():
     try:
