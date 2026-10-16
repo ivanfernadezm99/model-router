@@ -73,6 +73,9 @@ AVISO_TITLES = {
     "variante_A.png": "Variante A · demo-imagen",
     "variante_B.png": "Variante B · demo-imagen",
     "enlaces-chaco.png": "Aviso Enlaces Chaco (MVP)",
+    "ad-enlaces-chaco-20s-16x9.mp4": "Ad 20s · 16:9 (web / YouTube)",
+    "ad-enlaces-chaco-20s-1x1.mp4": "Ad 20s · 1:1 (feed)",
+    "ad-enlaces-chaco-20s-9x16.mp4": "Ad 20s · 9:16 (Reels / Stories)",
 }
 
 
@@ -89,13 +92,52 @@ def _asset_label(name):
     return stem.replace("_", " ").replace("-", " ").strip().capitalize()
 
 
-def _asset_note(name):
+_MP4_META_CACHE = {}
+
+
+def _mp4_note(p):
+    """Describe an MP4 from its real metadata (cached by mtime + size)."""
+    import json
+    import subprocess
+
+    try:
+        st = p.stat()
+        stamp = (st.st_mtime_ns, st.st_size)
+    except OSError:
+        return None
+    cached = _MP4_META_CACHE.get(str(p))
+    if cached and cached[0] == stamp:
+        return cached[1]
+    note = None
+    try:
+        proc = subprocess.run(
+            ["ffprobe", "-v", "error", "-print_format", "json",
+             "-show_format", "-show_streams", str(p)],
+            capture_output=True, text=True, timeout=5,
+        )
+        if proc.returncode == 0:
+            info = json.loads(proc.stdout)
+            streams = info.get("streams", [])
+            v = next((s for s in streams if s.get("codec_type") == "video"), None)
+            has_audio = any(s.get("codec_type") == "audio" for s in streams)
+            dur = float(info.get("format", {}).get("duration") or 0)
+            if v and v.get("width"):
+                note = (f"MP4 {v['width']}×{v['height']} · {dur:.1f} s"
+                        f" · {'con audio' if has_audio else 'sin audio'}")
+    except Exception:
+        note = None
+    _MP4_META_CACHE[str(p)] = (stamp, note)
+    return note
+
+
+def _asset_note(name, path=None):
     if name.startswith("aviso-00"):
         return "Montaje 5×2 de las 10 piezas · clic para ampliarla"
     if name.startswith("aviso-"):
         return "Aviso 1024×1024 · fondo IA + composición PIL"
     if name.lower().endswith(".mp4"):
-        return "MP4 1280×720 (16:9) · 6.0 s · con audio"
+        p = path if path is not None else (_generacion_dir() / name)
+        return _mp4_note(p) or "Video MP4"
     return "Aviso publicitario (PNG)"
 
 
@@ -126,7 +168,7 @@ def generacion():
             "exists": True,
             "size_mb": round(p.stat().st_size / 1048576, 2),
             "label": _asset_label(name),
-            "note": _asset_note(name),
+            "note": _asset_note(name, p),
             "is_video": p.suffix.lower() == ".mp4",
         }
         if name.startswith("aviso-00"):
