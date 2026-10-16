@@ -40,15 +40,15 @@
   <p class="muted small">
     <a href="/" style="color:var(--accent)">← inicio</a> ·
     <a href="/downloads" style="color:var(--accent)">descargas</a> ·
-    25 avisos de <strong>Enlaces Chaco</strong> + artefactos del MVP
+    {{ count }} piezas de <strong>Enlaces Chaco</strong> y videos publicitarios
     <code>contenido-visual-ia</code>
   </p>
 
-  {% if missing %}
-  <div class="card err" style="border-color:var(--err)">
-    ⚠️ Faltan archivos en <code>{{ base_dir }}/</code>:
-    {{ missing | join(', ') }}.
-    Generá y copiá las piezas desde <code>{{ avisos_src }}/</code> para verlas acá.
+  {% if empty %}
+  <div class="card">
+    La galería está vacía. Copiá las piezas generadas a
+    <code>{{ base_dir }}/</code> (por ejemplo desde <code>{{ avisos_src }}/</code>)
+    y aparecen acá solas, sin tocar código.
   </div>
   {% endif %}
 
@@ -59,7 +59,7 @@
       <img src="{{ sheet.url }}" alt="{{ sheet.label }}" loading="lazy">
     </a>
     <p class="muted small" style="margin-top:8px;">
-      Las 10 piezas en un solo cuadro — <strong>clic en la imagen para abrirla a tamaño completo</strong>
+      Vista de conjunto en un solo cuadro — <strong>clic en la imagen para abrirla a tamaño completo</strong>
       ({{ sheet.size_mb }} MB) y hacer zoom. Abajo tenés cada pieza suelta.
     </p>
   </div>

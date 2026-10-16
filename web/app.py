@@ -59,7 +59,7 @@ GENERACION_SUBDIR = ("static", "generacion")
 AVISOS_SRC = ("/media/servidor/d0a196c3-2d36-4431-b15d-8ea078ad8222"
               "/proyectos/contenido-visual-ia/output/enlaces-chaco/pro")
 AVISO_TITLES = {
-    "aviso-00-hoja-de-contacto.png": "Hoja de contacto · las 10 piezas",
+    "aviso-00-hoja-de-contacto.png": "Hoja de contacto · vista de conjunto",
     "aviso-01-arca.png": "01 · Facturación ARCA",
     "aviso-02-offline.png": "02 · Modo offline",
     "aviso-03-sucursales.png": "03 · Multi-sucursal",
@@ -176,9 +176,12 @@ def generacion():
         else:
             assets.append(entry)
 
-    missing = [n for n in AVISO_TITLES if not (base / n).is_file()]
+    # La carpeta es la fuente de verdad: NO hay una lista de "archivos que deben
+    # estar". Si borrás una pieza desaparece y la página no la reclama. Solo
+    # mostramos un aviso neutro cuando la galería quedó vacía.
     return render_template("generacion.html", assets=assets, sheet=sheet,
-                           missing=missing, avisos_src=AVISOS_SRC, base_dir=str(base))
+                           empty=not names, count=len(names),
+                           avisos_src=AVISOS_SRC, base_dir=str(base))
 
 
 @app.route("/generacion/delete/<name>", methods=["POST"])
