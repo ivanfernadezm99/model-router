@@ -3,3 +3,12 @@ __pycache__/
 .engram/
 .pytest_cache/
 
+# Runtime artifacts: logs/ must never be committed wholesale
+# (logs/tripwire.jsonl alone reaches ~170MB). Only the curated error log
+# is tracked on purpose; everything else stays local.
+logs/*
+!logs/router-errors.log
+
+# Playwright MCP console traces / page dumps (local debugging only)
+.playwright-mcp/
+
