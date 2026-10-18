@@ -202,6 +202,33 @@ def generacion_delete(name):
     return redirect(url_for("generacion"))
 
 
+@app.route("/generacion/upload-to-composer", methods=["POST"])
+def generacion_upload_to_composer():
+    """Proxy same-origin: sube la pieza al backend POS (presign Zernio) y
+    devuelve {publicUrl}. Evita CORS: el navegador solo habla con :5000.
+    El JWT viaja en el header Authorization del request y no se persiste."""
+    backend = os.environ.get(
+        "COMPOSER_BACKEND_API",
+        "https://posbackend-staging-prod.up.railway.app/api",
+    )
+    f = request.files.get("file")
+    if not f or not f.filename:
+        return jsonify({"error": "falta file"}), 400
+    auth = request.headers.get("Authorization", "")
+    if not auth.startswith("Bearer "):
+        return jsonify({"error": "falta JWT (Authorization: Bearer)"}), 401
+    try:
+        resp = requests.post(
+            f"{backend}/Zernio/media/upload",
+            headers={"Authorization": auth},
+            files={"file": (f.filename, f.read(), f.mimetype or "application/octet-stream")},
+            timeout=300,
+        )
+    except requests.RequestException as e:
+        return jsonify({"error": f"backend inaccesible: {e}"}), 502
+    return resp.content, resp.status_code, {"Content-Type": "application/json"}
+
+
 @app.route("/api/health")
 def health():
     try:
