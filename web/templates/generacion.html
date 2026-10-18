@@ -77,6 +77,7 @@
         <div style="margin-top:8px; display:flex; gap:6px;">
           <a class="btn primary" href="{{ a.url }}" download="{{ a.name }}">⬇️ Descargar</a>
           <a class="btn" href="{{ a.url }}" target="_blank" rel="noopener">🔗 Abrir</a>
+          <button class="btn" type="button" data-media-url="{{ a.url }}" data-media-name="{{ a.name }}" onclick="sendToComposer(this)">📤 Enviar al composer</button>
           <form action="/generacion/delete/{{ a.name }}" method="post" style="display:inline" onsubmit="return confirm('¿Borrar {{ a.name }} de la galería?');">
             <button class="btn" type="submit" style="border-color:var(--err); color:var(--err);">🗑️ Borrar</button>
           </form>
@@ -100,6 +101,7 @@
         <div style="margin-top:8px; display:flex; gap:6px;">
           <a class="btn primary" href="{{ a.url }}" download="{{ a.name }}">⬇️ Descargar</a>
           <a class="btn" href="{{ a.url }}" target="_blank" rel="noopener">🔗 Abrir</a>
+          <button class="btn" type="button" data-media-url="{{ a.url }}" data-media-name="{{ a.name }}" onclick="sendToComposer(this)">📤 Enviar al composer</button>
           <form action="/generacion/delete/{{ a.name }}" method="post" style="display:inline" onsubmit="return confirm('¿Borrar {{ a.name }} de la galería?');">
             <button class="btn" type="submit" style="border-color:var(--err); color:var(--err);">🗑️ Borrar</button>
           </form>
@@ -122,5 +124,59 @@
       <tr><td>Cómo se agrega una pieza</td><td>Copiá el PNG (o MP4) a <code>{{ base_dir }}/</code> y recargá: aparece sola, sin tocar código</td></tr>
     </table>
   </div>
+
+<script>
+// Frontend del composer (POSCuentasCorrientes). El upload va por el proxy
+// same-origin /generacion/upload-to-composer (evita CORS contra el backend).
+const FRONT_URL = 'https://poscuentascorrientes-stage.up.railway.app';
+
+async function sendToComposer(btn) {
+  const mediaUrl = btn.dataset.mediaUrl;
+  const mediaName = btn.dataset.mediaName || 'pieza';
+  const original = btn.textContent;
+  let jwt = sessionStorage.getItem('posJwt');
+  if (!jwt) {
+    jwt = prompt('Pegá tu JWT del POSBackend (se guarda solo en esta pestaña):');
+    if (!jwt) return;
+    sessionStorage.setItem('posJwt', jwt.trim());
+    jwt = sessionStorage.getItem('posJwt');
+  }
+  btn.disabled = true;
+  btn.textContent = '⏳ Subiendo…';
+  try {
+    const blobRes = await fetch(mediaUrl);
+    if (!blobRes.ok) throw new Error('no se pudo leer el archivo (' + blobRes.status + ')');
+    const blob = await blobRes.blob();
+    const form = new FormData();
+    form.append('file', blob, mediaName);
+    const upRes = await fetch('/generacion/upload-to-composer', {
+      method: 'POST',
+      headers: { 'Authorization': 'Bearer ' + jwt },
+      body: form
+    });
+    if (upRes.status === 401) {
+      sessionStorage.removeItem('posJwt');
+      throw new Error('JWT inválido o vencido. Recargá e intentá de nuevo.');
+    }
+    if (!upRes.ok) {
+      let detail = upRes.status;
+      try { detail = (await upRes.json()).error || detail; } catch (_) {}
+      throw new Error('upload falló (' + detail + ')');
+    }
+    const data = await upRes.json();
+    if (!data.publicUrl) throw new Error('el backend no devolvió publicUrl');
+    const caption = mediaName;
+    const url = FRONT_URL + '/#/social-media/composer?mediaUrl='
+      + encodeURIComponent(data.publicUrl) + '&caption=' + encodeURIComponent(caption);
+    window.open(url, '_blank');
+    btn.textContent = '✅ Enviado';
+  } catch (e) {
+    btn.textContent = original;
+    alert('No se pudo enviar al composer: ' + e.message);
+  } finally {
+    setTimeout(() => { btn.disabled = false; if (btn.textContent === '✅ Enviado') btn.textContent = original; }, 3000);
+  }
+}
+</script>
 </body>
 </html>

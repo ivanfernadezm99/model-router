@@ -226,7 +226,17 @@ def generacion_upload_to_composer():
         )
     except requests.RequestException as e:
         return jsonify({"error": f"backend inaccesible: {e}"}), 502
-    return resp.content, resp.status_code, {"Content-Type": "application/json"}
+    try:
+        body = resp.json()
+    except ValueError:
+        return jsonify({"error": "respuesta ilegible del backend"}), 502
+    if resp.status_code == 200 and body.get("isSuccess"):
+        public_url = (body.get("data") or {}).get("publicUrl")
+        if not public_url:
+            return jsonify({"error": "el backend no devolvió publicUrl"}), 502
+        return jsonify({"publicUrl": public_url})
+    message = body.get("message") or f"upload falló ({resp.status_code})"
+    return jsonify({"error": message}), resp.status_code
 
 
 @app.route("/api/health")
