@@ -209,7 +209,7 @@ def generacion_upload_to_composer():
     El JWT viaja en el header Authorization del request y no se persiste."""
     backend = os.environ.get(
         "COMPOSER_BACKEND_API",
-        "https://posbackend-staging-prod.up.railway.app/api",
+        "https://posfrontreform-stage-prod.up.railway.app/api",
     )
     f = request.files.get("file")
     if not f or not f.filename:
