@@ -8,6 +8,7 @@ import asyncio
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, Request
+from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse, PlainTextResponse, Response
 
 from src.gateway.adopt import (
@@ -30,6 +31,10 @@ logger = logging.getLogger(__name__)
 # ensure JSON request logs appear in journalctl (uvicorn default filters app loggers)
 logging.basicConfig(level=logging.INFO, format="%(message)s")
 logger.setLevel(logging.INFO)
+
+# Optional API key for /v1/* — short, validates if present; absent = allowed
+import os as _os
+GATEWAY_API_KEY = _os.environ.get("GATEWAY_API_KEY", "").strip()
 
 # singletons — importable for tests
 registry = Registry()
@@ -67,7 +72,6 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(lifespan=lifespan)
 # LOOP_GUARD_DISABLED=1 apaga temporalmente la gestión anti-loops (volver a habilitar borrando la var)
-import os as _os
 if _os.environ.get("LOOP_GUARD_DISABLED", "0") != "1":
     app.add_middleware(LoopGuardMiddleware)
 else:
@@ -76,10 +80,37 @@ app.include_router(job_router)
 
 
 @app.middleware("http")
+async def optional_api_key_auth(request: Request, call_next):
+    """Optional API key for /v1/* — validates if provided, allows if absent."""
+    if request.url.path.startswith("/v1/") and GATEWAY_API_KEY:
+        auth = request.headers.get("authorization", "")
+        # Existing direct clients omit Authorization. A supplied Bearer token,
+        # however, must match so 9router's connection check can detect typos.
+        if auth and (not auth.startswith("Bearer ") or auth[7:].strip() != GATEWAY_API_KEY):
+            return JSONResponse({"error": "invalid api key"}, status_code=401)
+    return await call_next(request)
+
+
+@app.middleware("http")
 async def touch_reaper_on_every_request(request: Request, call_next):
     """Reset idle reaper timer on ANY request (not just /v1 proxy)."""
     reaper.touch()
     return await call_next(request)
+
+
+# Registered LAST on purpose. Starlette wraps the middleware added first
+# innermost, so CORS has to be added after optional_api_key_auth for its 401 to
+# carry Access-Control-Allow-Origin: the 9router dashboard runs on :20128 and
+# validates this OpenAI endpoint from the browser, and an opaque CORS error
+# cannot tell "wrong key" apart from "gateway down".
+# Keep the browser validation same-host only; API clients remain unaffected.
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["http://localhost:20128", "http://127.0.0.1:20128"],
+    allow_credentials=False,
+    allow_methods=["GET", "POST", "OPTIONS"],
+    allow_headers=["Authorization", "Content-Type"],
+)
 
 
 @app.get("/debug/health")
