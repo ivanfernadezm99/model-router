@@ -126,9 +126,34 @@
   </div>
 
 <script>
-// Frontend del composer (POSCuentasCorrientes). El upload va por el proxy
+// Frontend del composer (POSFrontReform). El upload va por el proxy
 // same-origin /generacion/upload-to-composer (evita CORS contra el backend).
-const FRONT_URL = 'https://poscuentascorrientes-stage.up.railway.app';
+const FRONT_URL = 'https://posfrontreform-stage-prod.up.railway.app';
+const POS_LOGIN_URL = 'https://posfrontreform-stage-prod.up.railway.app/#/login';
+
+// Handoff de vuelta desde el login del POS: /generacion?token=...&businessId=...
+(function capturePOSHandoff() {
+  const params = new URLSearchParams(window.location.search);
+  const token = params.get('token');
+  if (!token) return;
+  sessionStorage.setItem('posJwt', token);
+  const businessId = params.get('businessId');
+  if (businessId) sessionStorage.setItem('posBusinessId', businessId);
+  params.delete('token');
+  params.delete('businessId');
+  params.delete('roleName');
+  const query = params.toString();
+  window.history.replaceState(
+    {},
+    '',
+    window.location.pathname + (query ? '?' + query : '') + window.location.hash
+  );
+})();
+
+function redirectToPOSLogin() {
+  const returnTo = window.location.origin + window.location.pathname;
+  window.location.href = POS_LOGIN_URL + '?returnUrl=' + encodeURIComponent(returnTo);
+}
 
 async function sendToComposer(btn) {
   const mediaUrl = btn.dataset.mediaUrl;
@@ -136,10 +161,9 @@ async function sendToComposer(btn) {
   const original = btn.textContent;
   let jwt = sessionStorage.getItem('posJwt');
   if (!jwt) {
-    jwt = prompt('Pegá tu JWT del POSBackend (se guarda solo en esta pestaña):');
-    if (!jwt) return;
-    sessionStorage.setItem('posJwt', jwt.trim());
-    jwt = sessionStorage.getItem('posJwt');
+    // Sin token: ir al login del POS y volver automáticamente con el JWT.
+    redirectToPOSLogin();
+    return;
   }
   btn.disabled = true;
   btn.textContent = '⏳ Subiendo…';
@@ -156,7 +180,9 @@ async function sendToComposer(btn) {
     });
     if (upRes.status === 401) {
       sessionStorage.removeItem('posJwt');
-      throw new Error('JWT inválido o vencido. Recargá e intentá de nuevo.');
+      btn.textContent = original;
+      redirectToPOSLogin();
+      return;
     }
     if (!upRes.ok) {
       let detail = upRes.status;
