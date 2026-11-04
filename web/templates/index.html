@@ -726,7 +726,16 @@ MODELS_CACHE.sort(function(a,b){
     loadHealth(); loadQueue();
     // si ya hay switch en curso al cargar, auto-muestra progreso
     (async function(){ try{ var r=await fetch('/api/switch-status'); var d=await r.json(); if(d.status==='switching' && d.model){ loadStatus.textContent = d.model+': cargando...'; startSwitchPolling(d.model); switchStartedAt = d.started_at ? new Date(d.started_at).getTime() : Date.now(); } }catch(e){} })();
-    setInterval(loadHealth, 5000); setInterval(loadQueue, 5000); setInterval(loadModels, 15000);
+    // Polling solo con la pestaña visible: en background el browser ya lo
+    // limita a ~1/min y no aporta nada. 30 s alcanza para ver swaps y cola;
+    // el catálogo de modelos cambia poco (un swap tarda ~60 s).
+    function tick(fn, ms) {
+      setInterval(function () { if (!document.hidden) fn(); }, ms);
+    }
+    tick(loadHealth, 30000); tick(loadQueue, 30000); tick(loadModels, 60000);
+    document.addEventListener('visibilitychange', function () {
+      if (!document.hidden) { loadHealth(); loadQueue(); loadModels(); }
+    });
   </script>
 </body>
 </html>
