@@ -4,6 +4,7 @@ import logging
 import os
 
 import requests
+import yaml
 from flask import Flask, jsonify, render_template, request
 
 log = logging.getLogger("model-router-web")
@@ -206,25 +207,51 @@ def generacion_delete(name):
 def generacion_upload_to_composer():
     """Proxy same-origin: sube la pieza al backend POS (presign Zernio) y
     devuelve {publicUrl}. Evita CORS: el navegador solo habla con :5000.
-    El JWT viaja en el header Authorization del request y no se persiste."""
+    Usa service token automático; si el usuario provee JWT, lo usa (fallback)."""
     backend = os.environ.get(
         "COMPOSER_BACKEND_API",
         "https://posfrontreform-stage-prod.up.railway.app/api",
     )
-    f = request.files.get("file")
-    if not f or not f.filename:
+    uploaded_file = request.files.get("file")
+    if uploaded_file is None or not uploaded_file.filename:
         return jsonify({"error": "falta file"}), 400
+
+    # COMPOSER_SERVICE_TOKEN is a POS backend JWT. Keep it outside tracked config.
+    # A per-user JWT may still be passed explicitly as Authorization.
     auth = request.headers.get("Authorization", "")
     if not auth.startswith("Bearer "):
-        return jsonify({"error": "falta JWT (Authorization: Bearer)"}), 401
+        service_token = os.environ.get("COMPOSER_SERVICE_TOKEN", "").strip()
+        if not service_token:
+            log.error("[upload-to-composer] COMPOSER_SERVICE_TOKEN is not configured")
+            return jsonify({"error": "no hay credencial de subida configurada en el servidor"}), 503
+        auth = f"Bearer {service_token}"
+
+    if auth == "Bearer ":
+        return jsonify({"error": "credencial de autorización vacía"}), 401
+    log.info("[upload-to-composer] Authorization credential selected")
+
+    # Do not permit an invalid/missing file object to reach the backend proxy.
+    if not hasattr(uploaded_file, "filename") or not hasattr(uploaded_file, "read"):
+        log.error("[upload-to-composer] Uploaded file was not parsed as a multipart file")
+        return jsonify({"error": "el campo file debe ser un archivo multipart"}), 400
+
     try:
+        log.info("[upload-to-composer] Sending request to %s/Zernio/media/upload", backend)
         resp = requests.post(
             f"{backend}/Zernio/media/upload",
             headers={"Authorization": auth},
-            files={"file": (f.filename, f.read(), f.mimetype or "application/octet-stream")},
+            files={
+                "file": (
+                    uploaded_file.filename,
+                    uploaded_file.read(),
+                    uploaded_file.mimetype or "application/octet-stream",
+                )
+            },
             timeout=300,
         )
+        log.info("[upload-to-composer] Response status: %s", resp.status_code)
     except requests.RequestException as e:
+        log.error("[upload-to-composer] Request error: %s", e)
         return jsonify({"error": f"backend inaccesible: {e}"}), 502
     try:
         body = resp.json()
