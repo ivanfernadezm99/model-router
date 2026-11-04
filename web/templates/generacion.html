@@ -65,6 +65,14 @@
   </div>
   {% endif %}
 
+<div class="card" style="position:sticky; top:8px; z-index:5; display:flex; align-items:center; gap:10px; flex-wrap:wrap;">
+    <strong id="selCount" class="small">0 seleccionadas</strong>
+    <button id="sendBatchBtn" class="btn primary" type="button" disabled onclick="sendSelectedToComposer()">📤 Enviar al composer</button>
+    <button class="btn" type="button" onclick="toggleSelectAll()">Seleccionar todo</button>
+    <button class="btn" type="button" onclick="clearSelection()">Limpiar</button>
+    <span id="batchHint" class="muted small"></span>
+  </div>
+
   <h2>Imágenes</h2>
   <div class="grid">
     {% for a in assets if not a.is_video %}
@@ -74,7 +82,10 @@
         <strong>{{ a.label }}</strong>
         <span class="badge ok">✓ presente · {{ a.size_mb }} MB</span>
         <div class="muted small">{{ a.note }}</div>
-        <div style="margin-top:8px; display:flex; gap:6px;">
+        <div style="margin-top:8px; display:flex; gap:6px; align-items:center; flex-wrap:wrap;">
+          <label class="small" style="display:flex; align-items:center; gap:4px; cursor:pointer;">
+            <input type="checkbox" class="sel" data-media-url="{{ a.url }}" data-media-name="{{ a.name }}" onchange="onSelectChange()"> seleccionar
+          </label>
           <a class="btn primary" href="{{ a.url }}" download="{{ a.name }}">⬇️ Descargar</a>
           <a class="btn" href="{{ a.url }}" target="_blank" rel="noopener">🔗 Abrir</a>
           <button class="btn" type="button" data-media-url="{{ a.url }}" data-media-name="{{ a.name }}" onclick="sendToComposer(this)">📤 Enviar al composer</button>
@@ -98,7 +109,10 @@
         <strong>{{ a.label }}</strong>
         <span class="badge ok">✓ presente · {{ a.size_mb }} MB</span>
         <div class="muted small">{{ a.note }}</div>
-        <div style="margin-top:8px; display:flex; gap:6px;">
+        <div style="margin-top:8px; display:flex; gap:6px; align-items:center; flex-wrap:wrap;">
+          <label class="small" style="display:flex; align-items:center; gap:4px; cursor:pointer;">
+            <input type="checkbox" class="sel" data-media-url="{{ a.url }}" data-media-name="{{ a.name }}" onchange="onSelectChange()"> seleccionar
+          </label>
           <a class="btn primary" href="{{ a.url }}" download="{{ a.name }}">⬇️ Descargar</a>
           <a class="btn" href="{{ a.url }}" target="_blank" rel="noopener">🔗 Abrir</a>
           <button class="btn" type="button" data-media-url="{{ a.url }}" data-media-name="{{ a.name }}" onclick="sendToComposer(this)">📤 Enviar al composer</button>
@@ -155,54 +169,128 @@ function redirectToPOSLogin() {
   window.location.href = POS_LOGIN_URL + '?returnUrl=' + encodeURIComponent(returnTo);
 }
 
-async function sendToComposer(btn) {
-  const mediaUrl = btn.dataset.mediaUrl;
-  const mediaName = btn.dataset.mediaName || 'pieza';
-  const original = btn.textContent;
+function getSelected() {
+  return Array.from(document.querySelectorAll('.sel:checked')).map(cb => ({
+    url: cb.dataset.mediaUrl,
+    name: cb.dataset.mediaName || 'pieza'
+  })).filter(x => x.url);
+}
+
+function onSelectChange() {
+  const n = getSelected().length;
+  document.getElementById('selCount').textContent = n + ' seleccionada' + (n === 1 ? '' : 's');
+  const btn = document.getElementById('sendBatchBtn');
+  btn.disabled = n === 0;
+  const hint = document.getElementById('batchHint');
+  if (n > 5) hint.textContent = '⚠ muchas piezas = upload pesado (base64)';
+  else hint.textContent = '';
+}
+
+function toggleSelectAll() {
+  const boxes = document.querySelectorAll('.sel');
+  const allChecked = Array.from(boxes).every(b => b.checked);
+  boxes.forEach(b => { b.checked = !allChecked; });
+  onSelectChange();
+}
+
+function clearSelection() {
+  document.querySelectorAll('.sel').forEach(b => { b.checked = false; });
+  onSelectChange();
+}
+
+function restoreSelection() {
+  let raw = null;
+  try { raw = sessionStorage.getItem('composerPendingSelection'); } catch (_) {}
+  if (!raw) return;
+  let urls = [];
+  try { urls = JSON.parse(raw) || []; } catch (_) { urls = []; }
+  if (!Array.isArray(urls) || !urls.length) { sessionStorage.removeItem('composerPendingSelection'); return; }
+  const set = new Set(urls);
+  document.querySelectorAll('.sel').forEach(cb => { if (set.has(cb.dataset.mediaUrl)) cb.checked = true; });
+  sessionStorage.removeItem('composerPendingSelection');
+  onSelectChange();
+}
+
+async function sendSelectedToComposer() {
+  const items = getSelected();
+  if (!items.length) { alert('Seleccioná al menos una pieza.'); return; }
   let jwt = sessionStorage.getItem('posJwt');
   if (!jwt) {
-    // Sin token: ir al login del POS y volver automáticamente con el JWT.
+    try { sessionStorage.setItem('composerPendingSelection', JSON.stringify(items.map(i => i.url))); } catch (_) {}
     redirectToPOSLogin();
     return;
   }
+  const btn = document.getElementById('sendBatchBtn');
+  const original = btn.textContent;
   btn.disabled = true;
-  btn.textContent = '⏳ Subiendo…';
+  // Abrir la pestaña DENTRO del gesto del usuario para evitar bloqueo de popup.
+  const win = window.open('', '_blank');
+  const publicUrls = [];
+  const failed = [];
   try {
-    const blobRes = await fetch(mediaUrl);
-    if (!blobRes.ok) throw new Error('no se pudo leer el archivo (' + blobRes.status + ')');
-    const blob = await blobRes.blob();
-    const form = new FormData();
-    form.append('file', blob, mediaName);
-    const upRes = await fetch('/generacion/upload-to-composer', {
-      method: 'POST',
-      headers: { 'Authorization': 'Bearer ' + jwt },
-      body: form
-    });
-    if (upRes.status === 401) {
-      sessionStorage.removeItem('posJwt');
-      btn.textContent = original;
-      redirectToPOSLogin();
-      return;
+    for (let i = 0; i < items.length; i++) {
+      btn.textContent = '⏳ Subiendo ' + (i + 1) + '/' + items.length + '…';
+      const item = items[i];
+      try {
+        const blobRes = await fetch(item.url);
+        if (!blobRes.ok) throw new Error('no se pudo leer el archivo (' + blobRes.status + ')');
+        const blob = await blobRes.blob();
+        const form = new FormData();
+        form.append('file', blob, item.name);
+        const upRes = await fetch('/generacion/upload-to-composer', {
+          method: 'POST',
+          headers: { 'Authorization': 'Bearer ' + jwt },
+          body: form
+        });
+        if (upRes.status === 401) {
+          sessionStorage.removeItem('posJwt');
+          try { sessionStorage.setItem('composerPendingSelection', JSON.stringify(items.map(i => i.url))); } catch (_) {}
+          btn.textContent = original;
+          if (win) win.close();
+          redirectToPOSLogin();
+          return;
+        }
+        if (!upRes.ok) {
+          let detail = upRes.status;
+          try { detail = (await upRes.json()).error || detail; } catch (_) {}
+          throw new Error(detail);
+        }
+        const data = await upRes.json();
+        if (!data.publicUrl) throw new Error('el backend no devolvió publicUrl');
+        publicUrls.push(data.publicUrl);
+      } catch (e) {
+        failed.push(item.name + ': ' + e.message);
+      }
     }
-    if (!upRes.ok) {
-      let detail = upRes.status;
-      try { detail = (await upRes.json()).error || detail; } catch (_) {}
-      throw new Error('upload falló (' + detail + ')');
+    if (!publicUrls.length) {
+      throw new Error('ninguna pieza se pudo subir' + (failed.length ? ' — ' + failed.join('; ') : ''));
     }
-    const data = await upRes.json();
-    if (!data.publicUrl) throw new Error('el backend no devolvió publicUrl');
-    const caption = mediaName;
-    const url = FRONT_URL + '/#/social-media/composer?mediaUrl='
-      + encodeURIComponent(data.publicUrl) + '&caption=' + encodeURIComponent(caption);
-    window.open(url, '_blank');
-    btn.textContent = '✅ Enviado';
+    const qs = publicUrls.map(u => 'mediaUrl=' + encodeURIComponent(u)).join('&');
+    const caption = items.length === 1 ? items[0].name : '';
+    const url = FRONT_URL + '/#/social-media/composer?' + qs + (caption ? '&caption=' + encodeURIComponent(caption) : '');
+    if (win) win.location.href = url;
+    else window.open(url, '_blank');
+    btn.textContent = '✅ Enviado' + (failed.length ? ' (' + failed.length + ' fallaron)' : '');
+    if (failed.length) alert('Algunas piezas fallaron:\n' + failed.join('\n'));
   } catch (e) {
     btn.textContent = original;
+    if (win) win.close();
     alert('No se pudo enviar al composer: ' + e.message);
   } finally {
-    setTimeout(() => { btn.disabled = false; if (btn.textContent === '✅ Enviado') btn.textContent = original; }, 3000);
+    setTimeout(() => { btn.disabled = false; if (btn.textContent === '✅ Enviado' || btn.textContent.startsWith('✅ Enviado')) btn.textContent = original; }, 3000);
   }
 }
+
+// Mantener compatibilidad con el botón por tarjeta: envía solo esa pieza.
+async function sendToComposer(btn) {
+  const cb = btn.closest('.art').querySelector('.sel');
+  if (cb) cb.checked = true;
+  onSelectChange();
+  await sendSelectedToComposer();
+  if (cb) cb.checked = false;
+  onSelectChange();
+}
+// Restaurar selección tras login y estado inicial.
+restoreSelection();
+onSelectChange();
 </script>
-</body>
-</html>
