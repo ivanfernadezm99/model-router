@@ -12,3 +12,9 @@ logs/*
 # Playwright MCP console traces / page dumps (local debugging only)
 .playwright-mcp/
 
+
+# Local gallery wiring: web/static/generacion is a symlink to the content
+# pipeline output (machine-specific absolute path). Never commit it, and never
+# commit the local media backup.
+web/static/generacion
+web/static/generacion_backup/
