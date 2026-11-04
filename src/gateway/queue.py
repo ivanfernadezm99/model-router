@@ -12,7 +12,7 @@ class GatewayQueue:
 
     - enqueue returns Retry-After seconds
     - coalesce: concurrent same-target does not trigger extra systemctl start (counted)
-    - qsize / depth reflects FIFO length
+    - depth() reflects live FIFO length, discarding items older than QUEUE_TIMEOUT_S
     - items expire after QUEUE_TIMEOUT_S -> caller should 504
     """
 
@@ -25,7 +25,32 @@ class GatewayQueue:
         self.swaps_total = 0
 
     def depth(self) -> int:
+        """Live queue depth.
+
+        Nothing consumes this FIFO in production: a deferred caller gets
+        202 + Retry-After and retries on its own, so every enqueue left an item
+        behind forever and queue_depth froze on stale numbers (that is what the
+        13 permanent ghosts in /health were). Drop anything that already
+        outlived QUEUE_TIMEOUT_S before reporting.
+        """
+        self._prune_expired()
         return self._q.qsize()
+
+    def _prune_expired(self) -> None:
+        """Discard expired items, preserving the FIFO order of survivors."""
+        if self._q.empty():
+            return
+        now = time.monotonic()
+        kept = []
+        while True:
+            try:
+                item = self._q.get_nowait()
+            except asyncio.QueueEmpty:
+                break
+            if now - item.get("created_at", 0) < self.timeout_s:
+                kept.append(item)
+        for item in kept:
+            self._q.put_nowait(item)
 
     def is_swapping(self) -> bool:
         return self.swapping_target is not None
