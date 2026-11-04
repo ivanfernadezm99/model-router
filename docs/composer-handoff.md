@@ -1,6 +1,6 @@
 # Handoff model-router ↔ POSFrontReform (composer)
 
-Última actualización: 2026-11-04 — commits `cbabac3`, `f782410`, `d46d4f9`, `7266434`.
+Última actualización: 2026-11-04 — commits `cbabac3`, `f782410`, `d46d4f9`, `7266434`, `d298a8f` (model-router) + `753259c` (POSCuentasCorrientes).
 
 Este documento explica cómo la galería de `/generacion` manda una pieza al
 composer del POS **sin pedirle el JWT al usuario**, y las trampas que ya nos
@@ -41,6 +41,28 @@ systemctl --user is-active model-router-web.service
   → POST /generacion/upload-to-composer (proxy same-origin, evita CORS)
   → window.open('/#/social-media/composer?mediaUrl=...&caption=...')
 ```
+
+## Multi-media por posteo (commit `d298a8f` + POSCuentasCorrientes `753259c`)
+
+La galería ahora permite **tildar varias tarjetas** y enviarlas en un solo
+posteo:
+
+- Cada tarjeta tiene un checkbox `class="sel"` con `data-media-url`/`data-media-name`.
+- Toolbar sticky con contador, "Enviar al composer", "Seleccionar todo" y "Limpiar".
+- `sendSelectedToComposer()` sube una pieza por vez (proxy single-file intacto),
+  abre la pestaña **dentro del gesto del usuario** (`window.open('', '_blank')`
+  primero) y arma la URL con `mediaUrl` repetido:
+  `/#/social-media/composer?mediaUrl=p1&mediaUrl=p2`.
+- El composer (POSCuentasCorrientes) lee `params.getAll('mediaUrl')` y precarga
+  secuencialmente; el publish ya arma `mediaItems[]`.
+- Sin sesión, la selección se guarda en `sessionStorage.composerPendingSelection`
+  y se restaura al volver del login.
+- `sendToComposer(btn)` por tarjeta sigue funcionando (selecciona solo esa y
+  delega al batch).
+
+Límites conocidos: el composer manda las previews en base64, así que varias
+piezas grandes (videos) pueden pesar mucho. Validación por plataforma
+(IG ≤10, story 1, reel 1 video) sigue pendiente.
 
 ## Reglas que no se negocian
 
