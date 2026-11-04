@@ -253,16 +253,30 @@ def generacion_upload_to_composer():
     except requests.RequestException as e:
         log.error("[upload-to-composer] Request error: %s", e)
         return jsonify({"error": f"backend inaccesible: {e}"}), 502
-    try:
-        body = resp.json()
-    except ValueError:
-        return jsonify({"error": "respuesta ilegible del backend"}), 502
-    if resp.status_code == 200 and body.get("isSuccess"):
+    raw = getattr(resp, "content", None)
+    body = None
+    if raw is None:
+        # Mocks/tests may only expose .json(); intentar parsear directamente.
+        try:
+            body = resp.json()
+            raw = b"parsed"
+        except Exception:
+            raw = b""
+    if raw and body is None:
+        try:
+            body = resp.json()
+        except ValueError:
+            log.error("[upload-to-composer] backend devolvió cuerpo no-JSON: %r", (raw or b"")[:200])
+            return jsonify({"error": f"backend devolvió respuesta ilegible (HTTP {resp.status_code})"}), 502
+    if resp.status_code == 401:
+        log.warning("[upload-to-composer] 401 del backend: token inválido o expirado")
+        return jsonify({"error": "sesión expirada o token inválido: volvé a iniciar sesión en el POS"}), 401
+    if resp.status_code == 200 and body and body.get("isSuccess"):
         public_url = (body.get("data") or {}).get("publicUrl")
         if not public_url:
             return jsonify({"error": "el backend no devolvió publicUrl"}), 502
         return jsonify({"publicUrl": public_url})
-    message = body.get("message") or f"upload falló ({resp.status_code})"
+    message = (body or {}).get("message") or f"upload falló ({resp.status_code})"
     return jsonify({"error": message}), resp.status_code
 
 
