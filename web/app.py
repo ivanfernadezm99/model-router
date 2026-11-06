@@ -205,7 +205,7 @@ def generacion_delete(name):
 
 @app.route("/generacion/upload-to-composer", methods=["POST"])
 def generacion_upload_to_composer():
-    """Proxy same-origin: sube la pieza al ECFileManager via streaming endpoint
+    """Proxy same-origin: sube la pieza al ECFileManager via multipart endpoint
     y devuelve {publicUrl}. Evita CORS: el navegador solo habla con :5000.
     Usa el JWT que el usuario trae del POS frontend."""
     # Load config from config.yaml
@@ -237,23 +237,22 @@ def generacion_upload_to_composer():
         log.error("[upload-to-composer] No application_id configured in config.yaml")
         return jsonify({"error": "falta application_id en configuración"}), 503
 
-    # Build the streaming upload URL
+    # Build the upload URL (ECFileManager multipart endpoint)
     file_name = uploaded_file.filename
     content_type = uploaded_file.mimetype or "application/octet-stream"
-    upload_url = f"{fm_base}/file/application/{fm_app_id}/stream?fileName={file_name}&contentType={content_type}"
+    upload_url = f"{fm_base}/file/application/{fm_app_id}"
 
-    log.info("[upload-to-composer] Streaming upload to %s", upload_url)
+    log.info("[upload-to-composer] Multipart upload to %s", upload_url)
 
     try:
-        # Read the file content and stream it directly
-        file_data = uploaded_file.read()
+        # Re-stream as multipart/form-data like POS backend does
+        files = {"file": (file_name, uploaded_file.stream, content_type)}
+        data = {"isTemporary": "false", "description": ""}
         resp = requests.post(
             upload_url,
-            headers={
-                "Authorization": auth,
-                "Content-Type": content_type,
-            },
-            data=file_data,
+            headers={"Authorization": auth},
+            files=files,
+            data=data,
             timeout=300,
         )
         log.info("[upload-to-composer] Response status: %s", resp.status_code)
@@ -280,9 +279,15 @@ def generacion_upload_to_composer():
         log.warning("[upload-to-composer] 401 del backend: token inválido")
         return jsonify({"error": "sesión expirada o token inválido"}), 401
 
-    # ECFileManager returns FileDTO on success
-    if resp.status_code in (200, 201) and body and body.get("id"):
-        file_id = body["id"]
+    # ECFileManager returns file ID (GUID) on success, either directly or wrapped
+    file_id = None
+    if resp.status_code in (200, 201) and body:
+        if isinstance(body, dict):
+            file_id = body.get("id") or body.get("data", {}).get("id")
+        elif isinstance(body, str):
+            file_id = body
+
+    if file_id:
         public_url = f"{fm_base}/file/{file_id}/download"
         log.info("[upload-to-composer] Upload successful, file_id=%s", file_id)
         return jsonify({"publicUrl": public_url})

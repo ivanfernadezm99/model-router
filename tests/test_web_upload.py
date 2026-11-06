@@ -10,16 +10,26 @@ def test_upload_to_composer_uses_user_jwt_and_preserves_multipart_file(monkeypat
     """User's JWT from Authorization header is used for ECFileManager upload."""
     captured = {}
 
-    def fake_post(url, *, headers, data, timeout):
+    def fake_post(url, *, headers, files, data, timeout):
         captured["url"] = url
         captured["headers"] = headers
+        captured["files"] = {}
+        for k, v in files.items():
+            if isinstance(v, tuple) and len(v) >= 3:
+                name, content, mime = v[0], v[1], v[2]
+                if hasattr(content, "read"):
+                    content.seek(0)
+                    content_bytes = content.read()
+                else:
+                    content_bytes = content
+                captured["files"][k] = (name, content_bytes, mime)
+            else:
+                captured["files"][k] = v
         captured["data"] = data
         captured["timeout"] = timeout
         return SimpleNamespace(
             status_code=200,
-            json=lambda: {
-                "id": "file-123",
-            },
+            json=lambda: {"id": "file-123"},
         )
 
     monkeypatch.setattr("web.app.requests.post", fake_post)
@@ -34,9 +44,12 @@ def test_upload_to_composer_uses_user_jwt_and_preserves_multipart_file(monkeypat
 
     assert response.status_code == 200
     assert response.get_json() == {"publicUrl": "https://ecfilemanager.duckdns.org/api/file/file-123/download"}
-    assert captured["url"] == "https://ecfilemanager.duckdns.org/api/file/application/061c9c31-3550-41d8-821c-631a6df26a1b/stream?fileName=generated.png&contentType=image/png"
-    assert captured["headers"] == {"Authorization": "Bearer user-session-token", "Content-Type": "image/png"}
-    assert captured["data"] == b"generated-image-bytes"
+    assert captured["url"] == "https://ecfilemanager.duckdns.org/api/file/application/061c9c31-3550-41d8-821c-631a6df26a1b"
+    assert captured["headers"] == {"Authorization": "Bearer user-session-token"}
+    assert captured["files"]["file"][0] == "generated.png"
+    assert captured["files"]["file"][1] == b"generated-image-bytes"
+    assert captured["files"]["file"][2] == "image/png"
+    assert captured["data"] == {"isTemporary": "false", "description": ""}
 
 
 def test_upload_to_composer_rejects_missing_or_invalid_auth_header(monkeypatch):
