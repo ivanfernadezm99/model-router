@@ -207,8 +207,7 @@ def generacion_delete(name):
 def generacion_upload_to_composer():
     """Proxy same-origin: sube la pieza al ECFileManager via streaming endpoint
     y devuelve {publicUrl}. Evita CORS: el navegador solo habla con :5000.
-    Usa SIEMPRE el service token del servidor (JWT del POS backend con acceso a FileManager).
-    El JWT del usuario (posJwt) solo sirve para la sesión en el POS Frontend, no para la API de FileManager."""
+    Usa el JWT que el usuario trae del POS frontend."""
     # Load config from config.yaml
     import pathlib
     import yaml as _yaml
@@ -224,32 +223,21 @@ def generacion_upload_to_composer():
 
     fm_base = filemanager_cfg.get("base_url", "https://ecfilemanager.duckdns.org/api")
     fm_app_id = filemanager_cfg.get("application_id", "")
-    fm_service_token = filemanager_cfg.get("service_token", "").strip()
-
-    # Allow env var override for service token
-    if not fm_service_token:
-        fm_service_token = os.environ.get("COMPOSER_SERVICE_TOKEN", "").strip()
 
     uploaded_file = request.files.get("file")
     if uploaded_file is None or not uploaded_file.filename:
         return jsonify({"error": "falta file"}), 400
 
-    # SIEMPRE usar el service token del servidor para ECFileManager
-    # El JWT del usuario (posJwt) es para el POS Frontend, no para FileManager
-    if not fm_service_token:
-        log.error("[upload-to-composer] No service token configured (config.yaml filemanager.service_token or COMPOSER_SERVICE_TOKEN env)")
-        return jsonify({"error": "no hay credencial de subida configurada en el servidor"}), 503
-    auth = f"Bearer {fm_service_token}"
-
-    if auth == "Bearer ":
-        return jsonify({"error": "credencial de autorización vacía"}), 401
+    # Authorization: usar el JWT del usuario que viene en el header
+    auth = request.headers.get("Authorization", "")
+    if not auth.startswith("Bearer "):
+        return jsonify({"error": "credencial de autorización faltante o inválida"}), 401
 
     if not fm_app_id:
-        log.error("[upload-to-composer] No application_id configured in config.yaml (filemanager.application_id)")
+        log.error("[upload-to-composer] No application_id configured in config.yaml")
         return jsonify({"error": "falta application_id en configuración"}), 503
 
     # Build the streaming upload URL
-    # POST /api/file/application/{applicationId}/stream?fileName=...&contentType=...&isTemporary=...&description=...
     file_name = uploaded_file.filename
     content_type = uploaded_file.mimetype or "application/octet-stream"
     upload_url = f"{fm_base}/file/application/{fm_app_id}/stream?fileName={file_name}&contentType={content_type}"
@@ -257,7 +245,7 @@ def generacion_upload_to_composer():
     log.info("[upload-to-composer] Streaming upload to %s", upload_url)
 
     try:
-        # Read the file content and stream it directly (no multipart/form-data)
+        # Read the file content and stream it directly
         file_data = uploaded_file.read()
         resp = requests.post(
             upload_url,
@@ -285,19 +273,18 @@ def generacion_upload_to_composer():
         try:
             body = resp.json()
         except ValueError:
-            log.error("[upload-to-composer] backend devolvió cuerpo no-JSON: %r", (raw or b"")[:200])
+            log.error("[upload-to-composer] backend devolvió cuerpo no-JSON")
             return jsonify({"error": f"backend devolvió respuesta ilegible (HTTP {resp.status_code})"}), 502
 
     if resp.status_code == 401:
-        log.warning("[upload-to-composer] 401 del backend: token inválido o expirado")
+        log.warning("[upload-to-composer] 401 del backend: token inválido")
         return jsonify({"error": "sesión expirada o token inválido"}), 401
 
-    # ECFileManager returns FileDTO on success (CreatedAtAction)
+    # ECFileManager returns FileDTO on success
     if resp.status_code in (200, 201) and body and body.get("id"):
-        # The FileDTO has 'id', we need to construct the public download URL
         file_id = body["id"]
         public_url = f"{fm_base}/file/{file_id}/download"
-        log.info("[upload-to-composer] Upload successful, file_id=%s, publicUrl=%s", file_id, public_url)
+        log.info("[upload-to-composer] Upload successful, file_id=%s", file_id)
         return jsonify({"publicUrl": public_url})
 
     message = (body or {}).get("message") or f"upload falló ({resp.status_code})"
