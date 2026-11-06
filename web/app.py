@@ -207,7 +207,8 @@ def generacion_delete(name):
 def generacion_upload_to_composer():
     """Proxy same-origin: sube la pieza al ECFileManager via streaming endpoint
     y devuelve {publicUrl}. Evita CORS: el navegador solo habla con :5000.
-    Usa service token automático (JWT del POS backend); si el usuario provee JWT, lo usa."""
+    Usa SIEMPRE el service token del servidor (JWT del POS backend con acceso a FileManager).
+    El JWT del usuario (posJwt) solo sirve para la sesión en el POS Frontend, no para la API de FileManager."""
     # Load config from config.yaml
     import pathlib
     import yaml as _yaml
@@ -233,13 +234,12 @@ def generacion_upload_to_composer():
     if uploaded_file is None or not uploaded_file.filename:
         return jsonify({"error": "falta file"}), 400
 
-    # Authorization: prefer user-provided JWT, else service token from config/env
-    auth = request.headers.get("Authorization", "")
-    if not auth.startswith("Bearer "):
-        if not fm_service_token:
-            log.error("[upload-to-composer] No service token configured (config.yaml filemanager.service_token or COMPOSER_SERVICE_TOKEN env)")
-            return jsonify({"error": "no hay credencial de subida configurada en el servidor"}), 503
-        auth = f"Bearer {fm_service_token}"
+    # SIEMPRE usar el service token del servidor para ECFileManager
+    # El JWT del usuario (posJwt) es para el POS Frontend, no para FileManager
+    if not fm_service_token:
+        log.error("[upload-to-composer] No service token configured (config.yaml filemanager.service_token or COMPOSER_SERVICE_TOKEN env)")
+        return jsonify({"error": "no hay credencial de subida configurada en el servidor"}), 503
+    auth = f"Bearer {fm_service_token}"
 
     if auth == "Bearer ":
         return jsonify({"error": "credencial de autorización vacía"}), 401
