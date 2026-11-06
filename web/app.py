@@ -205,58 +205,77 @@ def generacion_delete(name):
 
 @app.route("/generacion/upload-to-composer", methods=["POST"])
 def generacion_upload_to_composer():
-    """Proxy same-origin: sube la pieza al backend POS (presign Zernio) y
-    devuelve {publicUrl}. Evita CORS: el navegador solo habla con :5000.
-    Usa service token automático; si el usuario provee JWT, lo usa (fallback)."""
-    backend = os.environ.get(
-        "COMPOSER_BACKEND_API",
-        "https://posfrontreform-stage-prod.up.railway.app/api",
-    )
+    """Proxy same-origin: sube la pieza al ECFileManager via streaming endpoint
+    y devuelve {publicUrl}. Evita CORS: el navegador solo habla con :5000.
+    Usa service token automático (JWT del POS backend); si el usuario provee JWT, lo usa."""
+    # Load config from config.yaml
+    import pathlib
+    import yaml as _yaml
+    cfg_path = pathlib.Path("/home/servidor/Descargas/model-router/config.yaml")
+    if not cfg_path.exists():
+        cfg_path = pathlib.Path("config.yaml")
+    filemanager_cfg = {}
+    try:
+        cfg = _yaml.safe_load(cfg_path.read_text()) or {}
+        filemanager_cfg = cfg.get("filemanager", {})
+    except Exception as e:
+        log.warning("[upload-to-composer] Could not load filemanager config: %s", e)
+
+    fm_base = filemanager_cfg.get("base_url", "https://ecfilemanager.duckdns.org/api")
+    fm_app_id = filemanager_cfg.get("application_id", "")
+    fm_service_token = filemanager_cfg.get("service_token", "").strip()
+
+    # Allow env var override for service token
+    if not fm_service_token:
+        fm_service_token = os.environ.get("COMPOSER_SERVICE_TOKEN", "").strip()
+
     uploaded_file = request.files.get("file")
     if uploaded_file is None or not uploaded_file.filename:
         return jsonify({"error": "falta file"}), 400
 
-    # COMPOSER_SERVICE_TOKEN is a POS backend JWT. Keep it outside tracked config.
-    # A per-user JWT may still be passed explicitly as Authorization.
+    # Authorization: prefer user-provided JWT, else service token from config/env
     auth = request.headers.get("Authorization", "")
     if not auth.startswith("Bearer "):
-        service_token = os.environ.get("COMPOSER_SERVICE_TOKEN", "").strip()
-        if not service_token:
-            log.error("[upload-to-composer] COMPOSER_SERVICE_TOKEN is not configured")
+        if not fm_service_token:
+            log.error("[upload-to-composer] No service token configured (config.yaml filemanager.service_token or COMPOSER_SERVICE_TOKEN env)")
             return jsonify({"error": "no hay credencial de subida configurada en el servidor"}), 503
-        auth = f"Bearer {service_token}"
+        auth = f"Bearer {fm_service_token}"
 
     if auth == "Bearer ":
         return jsonify({"error": "credencial de autorización vacía"}), 401
-    log.info("[upload-to-composer] Authorization credential selected")
 
-    # Do not permit an invalid/missing file object to reach the backend proxy.
-    if not hasattr(uploaded_file, "filename") or not hasattr(uploaded_file, "read"):
-        log.error("[upload-to-composer] Uploaded file was not parsed as a multipart file")
-        return jsonify({"error": "el campo file debe ser un archivo multipart"}), 400
+    if not fm_app_id:
+        log.error("[upload-to-composer] No application_id configured in config.yaml (filemanager.application_id)")
+        return jsonify({"error": "falta application_id en configuración"}), 503
+
+    # Build the streaming upload URL
+    # POST /api/file/application/{applicationId}/stream?fileName=...&contentType=...&isTemporary=...&description=...
+    file_name = uploaded_file.filename
+    content_type = uploaded_file.mimetype or "application/octet-stream"
+    upload_url = f"{fm_base}/file/application/{fm_app_id}/stream?fileName={file_name}&contentType={content_type}"
+
+    log.info("[upload-to-composer] Streaming upload to %s", upload_url)
 
     try:
-        log.info("[upload-to-composer] Sending request to %s/Zernio/media/upload", backend)
+        # Read the file content and stream it directly (no multipart/form-data)
+        file_data = uploaded_file.read()
         resp = requests.post(
-            f"{backend}/Zernio/media/upload",
-            headers={"Authorization": auth},
-            files={
-                "file": (
-                    uploaded_file.filename,
-                    uploaded_file.read(),
-                    uploaded_file.mimetype or "application/octet-stream",
-                )
+            upload_url,
+            headers={
+                "Authorization": auth,
+                "Content-Type": content_type,
             },
+            data=file_data,
             timeout=300,
         )
         log.info("[upload-to-composer] Response status: %s", resp.status_code)
     except requests.RequestException as e:
         log.error("[upload-to-composer] Request error: %s", e)
         return jsonify({"error": f"backend inaccesible: {e}"}), 502
+
     raw = getattr(resp, "content", None)
     body = None
     if raw is None:
-        # Mocks/tests may only expose .json(); intentar parsear directamente.
         try:
             body = resp.json()
             raw = b"parsed"
@@ -268,14 +287,19 @@ def generacion_upload_to_composer():
         except ValueError:
             log.error("[upload-to-composer] backend devolvió cuerpo no-JSON: %r", (raw or b"")[:200])
             return jsonify({"error": f"backend devolvió respuesta ilegible (HTTP {resp.status_code})"}), 502
+
     if resp.status_code == 401:
         log.warning("[upload-to-composer] 401 del backend: token inválido o expirado")
-        return jsonify({"error": "sesión expirada o token inválido: volvé a iniciar sesión en el POS"}), 401
-    if resp.status_code == 200 and body and body.get("isSuccess"):
-        public_url = (body.get("data") or {}).get("publicUrl")
-        if not public_url:
-            return jsonify({"error": "el backend no devolvió publicUrl"}), 502
+        return jsonify({"error": "sesión expirada o token inválido"}), 401
+
+    # ECFileManager returns FileDTO on success (CreatedAtAction)
+    if resp.status_code in (200, 201) and body and body.get("id"):
+        # The FileDTO has 'id', we need to construct the public download URL
+        file_id = body["id"]
+        public_url = f"{fm_base}/file/{file_id}/download"
+        log.info("[upload-to-composer] Upload successful, file_id=%s, publicUrl=%s", file_id, public_url)
         return jsonify({"publicUrl": public_url})
+
     message = (body or {}).get("message") or f"upload falló ({resp.status_code})"
     return jsonify({"error": message}), resp.status_code
 
