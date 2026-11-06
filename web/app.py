@@ -253,7 +253,7 @@ def generacion_upload_to_composer():
             headers={"Authorization": auth},
             files=files,
             data=data,
-            timeout=300,
+            timeout=900,
         )
         log.info("[upload-to-composer] Response status: %s", resp.status_code)
     except requests.RequestException as e:
