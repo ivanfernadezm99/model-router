@@ -207,11 +207,10 @@ def generacion_delete(name):
 def generacion_upload_to_composer():
     """Proxy same-origin: sube la pieza al ECFileManager via streaming endpoint
     y devuelve {publicUrl}. Evita CORS: el navegador solo habla con :5000.
-    Valida el JWT del usuario (POS frontend) y usa service_token para ECFileManager."""
+    Usa el JWT que el usuario trae del POS frontend."""
     # Load config from config.yaml
     import pathlib
     import yaml as _yaml
-    import os
     cfg_path = pathlib.Path("/home/servidor/Descargas/model-router/config.yaml")
     if not cfg_path.exists():
         cfg_path = pathlib.Path("config.yaml")
@@ -222,16 +221,14 @@ def generacion_upload_to_composer():
     except Exception as e:
         log.warning("[upload-to-composer] Could not load filemanager config: %s", e)
 
-    fm_base = filemanager_cfg.get("base_url", "https://ecfilemanager.duckdns.org")
+    fm_base = filemanager_cfg.get("base_url", "https://ecfilemanager.duckdns.org/api")
     fm_app_id = filemanager_cfg.get("application_id", "")
-    # Service token for ECFileManager auth (from config or env override)
-    fm_service_token = filemanager_cfg.get("service_token", "") or os.getenv("COMPOSER_SERVICE_TOKEN", "")
 
     uploaded_file = request.files.get("file")
     if uploaded_file is None or not uploaded_file.filename:
         return jsonify({"error": "falta file"}), 400
 
-    # Authorization: validar JWT del usuario que viene en el header (proxy auth)
+    # Authorization: usar el JWT del usuario que viene en el header
     auth = request.headers.get("Authorization", "")
     if not auth.startswith("Bearer "):
         return jsonify({"error": "credencial de autorización faltante o inválida"}), 401
@@ -240,14 +237,10 @@ def generacion_upload_to_composer():
         log.error("[upload-to-composer] No application_id configured in config.yaml")
         return jsonify({"error": "falta application_id en configuración"}), 503
 
-    if not fm_service_token:
-        log.error("[upload-to-composer] No service_token configured for ECFileManager")
-        return jsonify({"error": "falta service_token para ECFileManager"}), 503
-
-    # Build the streaming upload URL (ECFileManager API at /api/...)
+    # Build the streaming upload URL
     file_name = uploaded_file.filename
     content_type = uploaded_file.mimetype or "application/octet-stream"
-    upload_url = f"{fm_base}/api/file/application/{fm_app_id}/stream?fileName={file_name}&contentType={content_type}"
+    upload_url = f"{fm_base}/file/application/{fm_app_id}/stream?fileName={file_name}&contentType={content_type}"
 
     log.info("[upload-to-composer] Streaming upload to %s", upload_url)
 
@@ -257,7 +250,7 @@ def generacion_upload_to_composer():
         resp = requests.post(
             upload_url,
             headers={
-                "Authorization": f"Bearer {fm_service_token}",
+                "Authorization": auth,
                 "Content-Type": content_type,
             },
             data=file_data,
@@ -290,7 +283,7 @@ def generacion_upload_to_composer():
     # ECFileManager returns FileDTO on success
     if resp.status_code in (200, 201) and body and body.get("id"):
         file_id = body["id"]
-        public_url = f"{fm_base}/api/file/{file_id}/download"
+        public_url = f"{fm_base}/file/{file_id}/download"
         log.info("[upload-to-composer] Upload successful, file_id=%s", file_id)
         return jsonify({"publicUrl": public_url})
 

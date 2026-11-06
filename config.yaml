@@ -131,8 +131,8 @@ defaults:
 # FileManager (ECFileManager) configuration for direct streaming uploads
 # Replaces the old posfrontreform-stage-prod.up.railway.app /api/Zernio/media/upload
 filemanager:
-  # Base URL of the FileManager (domain only, without /api)
-  base_url: "https://ecfilemanager.duckdns.org"
+  # Base URL of the FileManager API (production)
+  base_url: "https://ecfilemanager.duckdns.org/api"
   # Application ID to upload files to (create one in FileManager if needed)
   # This ID corresponds to an "Application" in FileManager: GET /api/application
   application_id: "061c9c31-3550-41d8-821c-631a6df26a1b"
