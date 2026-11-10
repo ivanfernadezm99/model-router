@@ -203,12 +203,9 @@ def generacion_delete(name):
     return redirect(url_for("generacion"))
 
 
-@app.route("/generacion/upload-to-composer", methods=["POST"])
-def generacion_upload_to_composer():
-    """Proxy same-origin: sube la pieza al ECFileManager via multipart endpoint
-    y devuelve {publicUrl}. Evita CORS: el navegador solo habla con :5000.
-    Usa el JWT que el usuario trae del POS frontend."""
-    # Load config from config.yaml
+@app.route("/api/ECFileManager/<path:subpath>", methods=["GET", "POST", "PUT", "DELETE"])
+def ec_file_manager_proxy(subpath):
+    """Proxy transparente para ECFileManager."""
     import pathlib
     import yaml as _yaml
     cfg_path = pathlib.Path("/home/servidor/Descargas/model-router/config.yaml")
@@ -219,81 +216,34 @@ def generacion_upload_to_composer():
         cfg = _yaml.safe_load(cfg_path.read_text()) or {}
         filemanager_cfg = cfg.get("filemanager", {})
     except Exception as e:
-        log.warning("[upload-to-composer] Could not load filemanager config: %s", e)
+        log.warning("[ec_file_manager_proxy] config error: %s", e)
 
     fm_base = filemanager_cfg.get("base_url", "https://ecfilemanager.duckdns.org/api")
-    fm_app_id = filemanager_cfg.get("application_id", "")
-
-    uploaded_file = request.files.get("file")
-    if uploaded_file is None or not uploaded_file.filename:
-        return jsonify({"error": "falta file"}), 400
-
-    # Authorization: usar el JWT del usuario que viene en el header
-    auth = request.headers.get("Authorization", "")
-    if not auth.startswith("Bearer "):
-        return jsonify({"error": "credencial de autorización faltante o inválida"}), 401
-
-    if not fm_app_id:
-        log.error("[upload-to-composer] No application_id configured in config.yaml")
-        return jsonify({"error": "falta application_id en configuración"}), 503
-
-    # Build the upload URL (ECFileManager multipart endpoint)
-    file_name = uploaded_file.filename
-    content_type = uploaded_file.mimetype or "application/octet-stream"
-    upload_url = f"{fm_base}/file/application/{fm_app_id}"
-
-    log.info("[upload-to-composer] Multipart upload to %s", upload_url)
-
+    target_url = f"{fm_base}/{subpath}"
+    
+    # Reenviar headers, omitiendo Host
+    headers = {k: v for k, v in request.headers if k.lower() != 'host'}
+    
+    # Reenviar parámetros de query
+    params = request.args
+    
+    # Reenviar cuerpo (si existe)
+    data = request.get_data()
+    
     try:
-        # Re-stream as multipart/form-data like POS backend does
-        files = {"file": (file_name, uploaded_file.stream, content_type)}
-        data = {"isTemporary": "false", "description": ""}
-        resp = requests.post(
-            upload_url,
-            headers={"Authorization": auth},
-            files=files,
+        resp = requests.request(
+            method=request.method,
+            url=target_url,
+            headers=headers,
+            params=params,
             data=data,
-            timeout=900,
+            timeout=30
         )
-        log.info("[upload-to-composer] Response status: %s", resp.status_code)
-    except requests.RequestException as e:
-        log.error("[upload-to-composer] Request error: %s", e)
+        return resp.content, resp.status_code, resp.headers.items()
+    except Exception as e:
+        log.error("[ec_file_manager_proxy] proxy error: %s", e)
         return jsonify({"error": f"backend inaccesible: {e}"}), 502
 
-    raw = getattr(resp, "content", None)
-    body = None
-    if raw is None:
-        try:
-            body = resp.json()
-            raw = b"parsed"
-        except Exception:
-            raw = b""
-    if raw and body is None:
-        try:
-            body = resp.json()
-        except ValueError:
-            log.error("[upload-to-composer] backend devolvió cuerpo no-JSON")
-            return jsonify({"error": f"backend devolvió respuesta ilegible (HTTP {resp.status_code})"}), 502
-
-    if resp.status_code == 401:
-        log.warning("[upload-to-composer] 401 del backend: token inválido")
-        return jsonify({"error": "sesión expirada o token inválido"}), 401
-
-    # ECFileManager returns file ID (GUID) on success, either directly or wrapped
-    file_id = None
-    if resp.status_code in (200, 201) and body:
-        if isinstance(body, dict):
-            file_id = body.get("id") or body.get("data", {}).get("id")
-        elif isinstance(body, str):
-            file_id = body
-
-    if file_id:
-        public_url = f"{fm_base}/file/{file_id}/download"
-        log.info("[upload-to-composer] Upload successful, file_id=%s", file_id)
-        return jsonify({"publicUrl": public_url})
-
-    message = (body or {}).get("message") or f"upload falló ({resp.status_code})"
-    return jsonify({"error": message}), resp.status_code
 
 
 @app.route("/api/health")
@@ -682,6 +632,70 @@ def submit():
             return jsonify({"id": data.get("id"), "job_id": data.get("id"), "target": model, "status": "queued"}), 202
         return jsonify({"error": resp.text[:500]}), resp.status_code
     except Exception as e:
+        return jsonify({"error": str(e)}), 502
+
+
+@app.route("/api/proxy-fetch", methods=["GET"])
+def proxy_fetch():
+    """Proxy para descargar archivos pesados evitando problemas de CORS."""
+    target_url = request.args.get("url")
+    if not target_url:
+        return jsonify({"error": "falta url"}), 400
+    
+    auth = request.headers.get("Authorization", "")
+    
+    try:
+        resp = requests.get(target_url, headers={"Authorization": auth}, stream=True, timeout=300)
+        return resp.content, resp.status_code, {"Content-Type": resp.headers.get("Content-Type", "application/octet-stream")}
+    except Exception as e:
+        log.error("[proxy-fetch] error: %s", e)
+        return jsonify({"error": str(e)}), 502
+
+
+@app.route("/generacion/upload-to-composer", methods=["POST"])
+def generacion_upload_to_composer():
+    """Proxy simple para subir al ECFileManager."""
+    import pathlib
+    import yaml as _yaml
+    cfg_path = pathlib.Path("/home/servidor/Descargas/model-router/config.yaml")
+    if not cfg_path.exists():
+        cfg_path = pathlib.Path("config.yaml")
+    filemanager_cfg = {}
+    try:
+        cfg = _yaml.safe_load(cfg_path.read_text()) or {}
+        filemanager_cfg = cfg.get("filemanager", {})
+    except Exception as e:
+        log.warning("[upload-to-composer] config error: %s", e)
+
+    fm_base = filemanager_cfg.get("base_url", "https://ecfilemanager.duckdns.org/api")
+    fm_app_id = filemanager_cfg.get("application_id", "")
+
+    uploaded_file = request.files.get("file")
+    if not uploaded_file:
+        return jsonify({"error": "falta file"}), 400
+
+    upload_url = f"{fm_base}/file/application/{fm_app_id}"
+    
+    # Authorization: usar el del request o el fallback de config/env si no viene
+    auth = request.headers.get("Authorization", "")
+    if not auth.startswith("Bearer "):
+        service_token = filemanager_cfg.get("service_token", "") or os.environ.get("COMPOSER_SERVICE_TOKEN", "")
+        if service_token:
+            auth = f"Bearer {service_token}"
+        else:
+            return jsonify({"error": "credencial de autorización faltante o inválida"}), 401
+    files = {"file": (uploaded_file.filename, uploaded_file.stream, uploaded_file.mimetype)}
+    data = {"isTemporary": "false", "description": ""}
+
+    try:
+        resp = requests.post(upload_url, headers={"Authorization": auth}, files=files, data=data, timeout=900)
+        if resp.status_code in (200, 201):
+            body = resp.json()
+            file_id = body.get("id") or (body.get("data") or {}).get("id") or body
+            return jsonify({"publicUrl": f"{fm_base}/file/{file_id}/download"})
+        return jsonify({"error": resp.text}), resp.status_code
+    except Exception as e:
+        log.error("[upload-to-composer] error: %s", e)
         return jsonify({"error": str(e)}), 502
 
 
