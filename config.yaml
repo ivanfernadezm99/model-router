@@ -1,4 +1,10 @@
 models:
+  nimble-9b-decision:
+    service: llama-nimble-9b.service
+    port: 9090
+    health_endpoint: /health
+    vram_mb: 10000
+    args: ["--model", "/home/servidor/Modelos/Nimble-9B-Q8_0.gguf", "-c", "2048", "-np", "1", "-ngl", "99", "--host", "127.0.0.1", "--port", "9090", "--alias", "nimble-decision"]
   qwen3-27b-flagship:
     service: llama-code-qwen3-27b.service
     port: 8082
@@ -69,12 +75,6 @@ models:
     health_endpoint: /health
     vram_mb: 22000
     args: ["--model", "/home/servidor/Modelos/Qwen3-Coder/Qwen3-Coder-30B-A3B-Instruct-Q4_K_M.gguf", "-c", "190000", "--ctx-size", "190000", "--rope-scaling", "yarn", "--yarn-orig-ctx", "32768", "-ctk", "q4_0", "-ctv", "q4_0", "-ngl", "99", "-np", "1", "--kv-unified", "--no-kv-offload", "--flash-attn", "on", "--jinja", "--chat-template-file", "/home/servidor/Descargas/model-router/templates/qwen3-coder-tools.jinja", "--alias", "local-template"]
-  coder-30b-q5-100k:
-    service: llama-code-30b-q5-100k.service
-    port: 8082
-    health_endpoint: /health
-    vram_mb: 23000
-    args: ["--model", "/home/servidor/Modelos/Qwen3-Coder/Qwen3-Coder-30B-A3B-Instruct-Q5_K_M.gguf", "-c", "100000", "-np", "1", "--ctx-size", "100000", "--rope-scaling", "yarn", "--yarn-orig-ctx", "32768", "-ctk", "q4_0", "-ctv", "q4_0", "-ngl", "99", "-np", "1", "--kv-unified", "--no-kv-offload", "--flash-attn", "on", "--jinja", "--chat-template-file", "/home/servidor/Descargas/model-router/templates/qwen3-coder-tools.jinja", "--alias", "local-template"]
   coder-q5-65k:
     service: llama-code-q5.service
     port: 8082

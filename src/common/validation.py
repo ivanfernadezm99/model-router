@@ -1,7 +1,7 @@
 import re
 import subprocess
 
-ALLOWED = {"127.0.0.1:8082/health", "127.0.0.1:8083/health", "127.0.0.1:8188/system_stats", "127.0.0.1:8189/health", "127.0.0.1:8191/health", "127.0.0.1:8192/health"}
+ALLOWED = {"127.0.0.1:8082/health", "127.0.0.1:8083/health", "127.0.0.1:8188/system_stats", "127.0.0.1:8189/health", "127.0.0.1:8191/health", "127.0.0.1:8192/health", "127.0.0.1:9090/health"}
 
 # Excepción chatbot multi-usuario: solo estos services pueden usar -np > 1.
 # El resto del proyecto sigue single-slot (determinismo anti-loops).
