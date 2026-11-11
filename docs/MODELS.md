@@ -8,7 +8,6 @@
 | 🥈 **PUESTO 2** | `coder-30b-a3b` — Qwen3-Coder-30B-A3B-Instruct Q4_K_M | 12 GB | 100K (yarn 32k→100k 3.1x) | **Calidad óptima** — YaRN bajo, más preciso que 190K, fallback estable |
 | 🥉 **PUESTO 3** | `coder-14b-100k` — Qwen2.5-Coder-14B-Instruct Q4_K_M | 14 GB | 100K (yarn 32k→100k) | **Relegado** — Ex-puesto 1 hasta 2026-09-18 |
 | — | `coder-30b-150k` | 18 GB | 150K | Intermedio Qwen3 MoE |
-| — | `coder-30b-q5-100k` | 23 GB | 100K | Qwen3 Q5 — mejor calidad, más VRAM |
 | — | `coder-q5-65k` | 18 GB | 65K | Legacy |
 | 🔮 **VISIÓN** | `vision-7b` — Qwen2.5-VL-7B-Instruct Q4_K_M | 11.7 GB | 128K | **CPU/RAM** — descripción de imágenes en markdown |
 

@@ -4,12 +4,16 @@ import redis
 from datetime import datetime, timezone
 from typing import Any, Dict, Optional
 
+import logging
+
 # Constants
 JOB_TTL_SECONDS = 7 * 24 * 60 * 60  # 7 days
 JOB_KEY_PREFIX = "job:"  # redis key prefix
 
 MAX_RETRIES = 3              # máximo de reintentos por job
 RETRY_BACKOFF_SECONDS = 60  # retraso base entre reintentos (segundos)
+
+logger = logging.getLogger(__name__)
 
 class JobQueue:
     """Redis-backed job queue with retry support and failure visibility.
@@ -26,7 +30,9 @@ class JobQueue:
     consumer RabbitMQ no corre por default; el JobQueue provee esa visibilidad por sí solo.
     """
 
-    def __init__(self, redis_url: str = "redis://127.0.0.1:6379/0") -> None:
+    def __init__(self, redis_url: Optional[str] = None) -> None:
+        if redis_url is None:
+            redis_url = __import__("os").getenv("REDIS_URL", "redis://127.0.0.1:6379/0")
         self.redis = redis.from_url(redis_url, decode_responses=True)
 
     def _key(self, job_id: str) -> str:

@@ -13,6 +13,8 @@ import asyncio
 import os
 import shutil
 
+logger = logging.getLogger(__name__)
+
 import httpx
 
 from src.jobs.queue import JobQueue
